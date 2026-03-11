@@ -6,13 +6,14 @@ export default async function handler(req, res) {
       const lat = Number(req.body?.lat);
       const lng = Number(req.body?.lng);
       const message = req.body?.message || "";
+      const status = req.body?.status || "Reported"; // Get status from the frontend
 
-      // Make sure we have valid numbers
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
         return res.status(400).json({ error: "lat/lng must be valid numbers" });
       }
 
-      const pin = await savePin({ lat, lng, description: message });
+      // Pass the status down to the save function
+      const pin = await savePin({ lat, lng, description: message, status });
       return res.status(201).json(pin);
     }
 

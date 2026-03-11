@@ -1,32 +1,3 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Anonymous Community Map</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <style>
-    body { margin: 0; font-family: Arial, sans-serif; }
-    #map { height: 70vh; width: 100%; }
-    .controls { padding: 10px; background: #f0f0f0; }
-    .clear-report { background: red; color: white; padding: 10px; margin: 10px 0; }
-    button { background: #007cba; color: white; border: none; padding: 10px 20px; margin: 5px; cursor: pointer; }
-    textarea { width: 100%; box-sizing: border-box; }
-  </style>
-</head>
-<body>
-  <div class="controls">
-    <h3>🛡️ Anonymous Community Map</h3>
-    <button onclick="toggleReport()">📍 Drop Pin</button>
-    <button onclick="copyCLEAR()">📋 Copy CLEAR Report</button>
-    <div id="status">Ready</div>
-  </div>
-  <div id="map"></div>
-  <div class="clear-report" id="clearReport" style="display:none;">
-    <strong>CLEAR Report (copy to Signal):</strong><br>
-    <textarea id="clearText" rows="4"></textarea>
-  </div>
-
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     const statusEl = document.getElementById('status');
@@ -42,9 +13,31 @@
     }).addTo(map);
 
     function setStatus(msg) { statusEl.textContent = msg; }
-    function popupNode(message) {
+
+    // Helper function to create color-coded map markers
+    function getColoredIcon(status) {
+      let color = 'blue'; // Default: Under Verification
+      if (status === 'Reported') color = 'grey';
+      if (status === 'Confirmed') color = 'red';
+      if (status === 'Resolved') color = 'green';
+      
+      return new L.Icon({
+        iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+      });
+    }
+
+    function popupNode(pin) {
       const div = document.createElement('div');
-      div.textContent = message?.trim() ? message.trim() : 'Anonymous pin';
+      div.innerHTML = `
+        <strong>Status: ${pin.status || 'Reported'}</strong><br/>
+        <span style="font-size: 0.9em; color: #555;">Note: ${pin.description || 'No note'}</span><br/>
+        <span style="font-size: 0.8em; color: #888;">Reported: ${new Date(pin.createdAt).toLocaleTimeString()}</span>
+      `;
       return div;
     }
 
@@ -54,11 +47,12 @@
         const res = await fetch('/api/pins');
         if (!res.ok) throw new Error(`GET /api/pins failed: ${res.status}`);
         const pins = await res.json();
+        
         markers.clearLayers();
         pins.forEach(p => {
-          L.marker([p.lat, p.lng])
+          L.marker([p.lat, p.lng], { icon: getColoredIcon(p.status) })
             .addTo(markers)
-            .bindPopup(popupNode(p.message));
+            .bindPopup(popupNode(p));
         });
         setStatus('Ready');
       } catch (e) {
@@ -68,25 +62,36 @@
 
     map.on('click', async (e) => {
       if (!dropMode) return;
+      
+      // Simple custom prompt for status and note
+      const statusInput = prompt('Enter status (Type 1, 2, 3, or 4):\n1 = Reported\n2 = Under Verification\n3 = Confirmed\n4 = Resolved', '1');
+      if (!statusInput) { dropMode = false; setStatus('Ready'); return; }
+      
+      let statusString = 'Reported';
+      if (statusInput === '2') statusString = 'Under Verification';
+      if (statusInput === '3') statusString = 'Confirmed';
+      if (statusInput === '4') statusString = 'Resolved';
+
       const message = prompt('Optional note (anonymous):') ?? '';
 
       try {
-        setStatus('Saving pin…');
+        setStatus('Saving pin… (Location is being automatically fuzzed for safety)');
         const res = await fetch('/api/pins', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lat: e.latlng.lat, lng: e.latlng.lng, message })
+          body: JSON.stringify({ lat: e.latlng.lat, lng: e.latlng.lng, message, status: statusString })
         });
         if (!res.ok) throw new Error(`POST /api/pins failed: ${res.status}`);
         const pin = await res.json();
 
-        L.marker([pin.lat, pin.lng])
+        // Add the new marker to the map immediately
+        L.marker([pin.lat, pin.lng], { icon: getColoredIcon(pin.status) })
           .addTo(markers)
-          .bindPopup(popupNode(pin.message))
+          .bindPopup(popupNode(pin))
           .openPopup();
 
-        clearText.value = `Lat: ${pin.lat}, Lng: ${pin.lng}\nNote: ${pin.message || '(none)'}`;
-        setStatus('Pin saved');
+        clearText.value = `Status: ${pin.status}\nFuzzed Lat: ${pin.lat.toFixed(4)}, Lng: ${pin.lng.toFixed(4)}\nNote: ${pin.description || '(none)'}`;
+        setStatus('Pin saved securely');
       } catch (e) {
         setStatus(`Error: ${e.message}`);
       } finally {
@@ -108,5 +113,3 @@
 
     loadPins();
   </script>
-</body>
-</html>
