@@ -1,4 +1,63 @@
+  <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anonymous Community Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <!-- CSS STYLE-->
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; }
+    #map { height: 70vh; width: 100%; }
+    .controls { padding: 10px; background: #f0f0f0; }
+    .clear-report { background: red; color: white; padding: 10px; margin: 10px 0; }
+    button { background: #007cba; color: white; border: none; padding: 10px 20px; margin: 5px; cursor: pointer; border-radius: 4px;}
+    textarea { width: 100%; box-sizing: border-box; }
+
+    /* Login Screen Styles */
+    #login-screen {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: white; z-index: 9999; display: flex; 
+      flex-direction: column; align-items: center; justify-content: center;
+    }
+    #login-screen input { padding: 10px; font-size: 16px; margin: 10px 0; width: 80%; max-width: 300px; }
+    
+    /* Hides the main app until they log in */
+    #main-app { display: none; } 
+  </style>
+</head>
+
+<body>
+  <!-- PASSWORD SCREEN -->
+  <div id="login-screen">
+    <h3>🛡️ Secure Access Required</h3>
+    <p>Enter dispatcher access code:</p>
+    <input type="password" id="accessCodeInput" placeholder="Access code..." />
+    <button onclick="checkAccess()">Enter</button>
+    <div id="login-error" style="color: red; margin-top: 10px;"></div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="main-app">
+    <div class="controls">
+      <h3>🛡️ Anonymous Community Map</h3>
+      <button onclick="toggleReport()">📍 Drop Pin</button>
+      <button onclick="copyCLEAR()">📋 Copy CLEAR Report</button>
+      <button onclick="logout()" style="background: #d9534f; float: right;">Logout</button>
+      <div id="status">Ready</div>
+    </div>
+    <div id="map"></div>
+    <div class="clear-report" id="clearReport" style="display:none;">
+      <strong>CLEAR Report (copy to Signal):</strong><br>
+      <textarea id="clearText" rows="4"></textarea>
+    </div>
+  </div>
+
+  <!-- LEAFLET SCRIPT -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <!-- APP LOGIC SCRIPT -->
   <script>
     const statusEl = document.getElementById('status');
     const clearBox = document.getElementById('clearReport');
@@ -14,9 +73,43 @@
 
     function setStatus(msg) { statusEl.textContent = msg; }
 
-    // Helper function to create color-coded map markers
+    // --- LOGIN LOGIC ---
+    function checkAccess() {
+      const code = document.getElementById('accessCodeInput').value;
+      if (!code) return;
+      
+      localStorage.setItem('map_access_code', code);
+      document.getElementById('login-error').textContent = "Checking...";
+      
+      loadPins().then(success => {
+        if (success) {
+          document.getElementById('login-screen').style.display = 'none';
+          document.getElementById('main-app').style.display = 'block';
+          map.invalidateSize(); // Fixes map rendering glitch after un-hiding
+        } else {
+          document.getElementById('login-error').textContent = "Invalid access code.";
+          localStorage.removeItem('map_access_code');
+        }
+      });
+    }
+
+    function logout() {
+      localStorage.removeItem('map_access_code');
+      location.reload();
+    }
+
+    // Auto-login check when page loads
+    window.onload = () => {
+      if (localStorage.getItem('map_access_code')) {
+        document.getElementById('accessCodeInput').value = localStorage.getItem('map_access_code');
+        checkAccess();
+      }
+    };
+
+
+    // --- MAP LOGIC ---
     function getColoredIcon(status) {
-      let color = 'blue'; // Default: Under Verification
+      let color = 'blue'; 
       if (status === 'Reported') color = 'grey';
       if (status === 'Confirmed') color = 'red';
       if (status === 'Resolved') color = 'green';
@@ -42,12 +135,19 @@
     }
 
     async function loadPins() {
+      const code = localStorage.getItem('map_access_code');
+      if (!code) return false;
+
       try {
         setStatus('Loading pins…');
-        const res = await fetch('/api/pins');
-        if (!res.ok) throw new Error(`GET /api/pins failed: ${res.status}`);
-        const pins = await res.json();
+        const res = await fetch('/api/pins', {
+          headers: { 'x-access-code': code } // Send password
+        });
         
+        if (res.status === 401) return false; // Wrong password
+        if (!res.ok) throw new Error(`GET failed: ${res.status}`);
+        
+        const pins = await res.json();
         markers.clearLayers();
         pins.forEach(p => {
           L.marker([p.lat, p.lng], { icon: getColoredIcon(p.status) })
@@ -55,15 +155,16 @@
             .bindPopup(popupNode(p));
         });
         setStatus('Ready');
+        return true;
       } catch (e) {
         setStatus(`Error: ${e.message}`);
+        return false;
       }
     }
 
     map.on('click', async (e) => {
       if (!dropMode) return;
       
-      // Simple custom prompt for status and note
       const statusInput = prompt('Enter status (Type 1, 2, 3, or 4):\n1 = Reported\n2 = Under Verification\n3 = Confirmed\n4 = Resolved', '1');
       if (!statusInput) { dropMode = false; setStatus('Ready'); return; }
       
@@ -75,22 +176,27 @@
       const message = prompt('Optional note (anonymous):') ?? '';
 
       try {
-        setStatus('Saving pin… (Location is being automatically fuzzed for safety)');
+        setStatus('Saving pin…');
         const res = await fetch('/api/pins', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-access-code': localStorage.getItem('map_access_code') // Send password
+          },
           body: JSON.stringify({ lat: e.latlng.lat, lng: e.latlng.lng, message, status: statusString })
         });
-        if (!res.ok) throw new Error(`POST /api/pins failed: ${res.status}`);
+        
+        if (res.status === 401) { logout(); return; } // Kicked out
+        if (!res.ok) throw new Error(`POST failed: ${res.status}`);
+        
         const pin = await res.json();
 
-        // Add the new marker to the map immediately
         L.marker([pin.lat, pin.lng], { icon: getColoredIcon(pin.status) })
           .addTo(markers)
           .bindPopup(popupNode(pin))
           .openPopup();
 
-        clearText.value = `Status: ${pin.status}\nFuzzed Lat: ${pin.lat.toFixed(4)}, Lng: ${pin.lng.toFixed(4)}\nNote: ${pin.description || '(none)'}`;
+        clearText.value = `Status: ${pin.status}\nLat: ${pin.lat.toFixed(4)}, Lng: ${pin.lng.toFixed(4)}\nNote: ${pin.description || '(none)'}`;
         setStatus('Pin saved securely');
       } catch (e) {
         setStatus(`Error: ${e.message}`);
@@ -111,5 +217,80 @@
       setStatus('Copied');
     };
 
-    loadPins();
+    // ADD THESE FUNCTIONS AT THE TOP OF YOUR SCRIPT
+function checkAccess() {
+  const code = document.getElementById('accessCodeInput').value;
+  if (!code) return;
+  
+  // Save to browser storage
+  localStorage.setItem('map_access_code', code);
+  
+  // Try to load pins to test if the code works
+  document.getElementById('login-error').textContent = "Checking...";
+  loadPins().then(success => {
+    if (success) {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('main-app').style.display = 'block';
+      // Fix leaflet map rendering bug when un-hiding a div
+      map.invalidateSize(); 
+    } else {
+      document.getElementById('login-error').textContent = "Invalid access code.";
+      localStorage.removeItem('map_access_code'); // delete bad code
+    }
+  });
+}
+
+function logout() {
+  localStorage.removeItem('map_access_code');
+  location.reload();
+}
+
+// UPDATE THIS FUNCTION
+async function loadPins() {
+  const code = localStorage.getItem('map_access_code');
+  if (!code) return false;
+
+  try {
+    setStatus('Loading pins…');
+    const res = await fetch('/api/pins', {
+      headers: { 'x-access-code': code } // SEND THE PASSWORD
+    });
+    
+    if (res.status === 401) return false; // Wrong password
+    if (!res.ok) throw new Error(`GET failed: ${res.status}`);
+    
+    const pins = await res.json();
+    markers.clearLayers();
+    pins.forEach(p => {
+      L.marker([p.lat, p.lng], { icon: getColoredIcon(p.status) })
+        .addTo(markers)
+        .bindPopup(popupNode(p));
+    });
+    setStatus('Ready');
+    return true; // Success
+  } catch (e) {
+    setStatus(`Error: ${e.message}`);
+    return false;
+  }
+}
+
+// UPDATE YOUR FETCH IN map.on('click') TO INCLUDE THE HEADER:
+const res = await fetch('/api/pins', {
+  method: 'POST',
+  headers: { 
+    'Content-Type': 'application/json',
+    'x-access-code': localStorage.getItem('map_access_code') // SEND THE PASSWORD
+  },
+  body: JSON.stringify({ lat: e.latlng.lat, lng: e.latlng.lng, message, status: statusString })
+});
+
+// Auto-login if they already have a code saved
+window.onload = () => {
+  if (localStorage.getItem('map_access_code')) {
+    checkAccess(); // attempts to log in automatically
+  }
+};
+
   </script>
+</body>
+</html>
