@@ -1,38 +1,34 @@
-// lib/pinsKv.js
-import { kv } from "@vercel/kv";
+import { Redis } from "@upstash/redis";
+
+// This automatically finds the tokens Vercel created
+const redis = Redis.fromEnv();
 
 export const RETENTION_SECONDS = 60 * 60 * 24 * 21; // 3 weeks
 export const RETENTION_MS = RETENTION_SECONDS * 1000;
-const MAX_DESC_LEN = 280;
-
-function clampText(s) {
-  return String(s ?? "").replace(/[\\u0000-\\u001F\\u007F]/g, "").trim().slice(0, MAX_DESC_LEN);
-}
 
 export async function savePin({ lat, lng, description = "" }) {
-  const id = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const id = crypto.randomUUID();
   const createdAt = Date.now();
-  const pin = {
-    id,
-    lat: Number(lat),
-    lng: Number(lng),
-    description: clampText(description),
-    createdAt,
-  };
-  await kv.set(`pin:${id}`, pin, { ex: RETENTION_SECONDS });
-  await kv.zadd("pins:index", { score: createdAt, member: id });
+  const pin = { id, lat: Number(lat), lng: Number(lng), description, createdAt };
+  
+  // Save to Redis
+  await redis.set(`pin:${id}`, JSON.stringify(pin), { ex: RETENTION_SECONDS });
+  await redis.zadd("pins:index", { score: createdAt, member: id });
+  
   return pin;
 }
 
 export async function listPinsLast3Weeks() {
   const now = Date.now();
   const cutoff = now - RETENTION_MS;
-  const ids = await kv.zrange("pins:index", cutoff, now, { byScore: true });
-  const pins = await Promise.all(ids.map(id => kv.get(`pin:${id}`)));
-  return pins.filter(Boolean);
-}
+  
+  const ids = await redis.zrange("pins:index", cutoff, now, { byScore: true });
+  if (!ids || ids.length === 0) return [];
 
-export async function cleanupOldPins() {
-  const cutoff = Date.now() - RETENTION_MS;
-  await kv.zremrangebyscore("pins:index", "-inf", cutoff);
+  const pins = await Promise.all(
+    ids.map(id => redis.get(`pin:${id}`))
+  );
+  
+  // Clean up any nulls and parse the JSON strings back into objects
+  return pins.filter(Boolean).map(pin => typeof pin === 'string' ? JSON.parse(pin) : pin);
 }
