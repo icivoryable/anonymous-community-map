@@ -38,6 +38,25 @@
   </div>
 
   <!-- MAIN APP -->
+
+  <!-- MAIN APP -->
+  <div id="main-app">
+    <div class="controls">
+      <h3>🛡️ Anonymous Community Map</h3>
+      
+      <!-- NEW SEARCH BAR -->
+      <div style="margin-bottom: 10px; display: flex; gap: 5px;">
+        <input type="text" id="searchInput" placeholder="Search neighborhood or intersection..." style="flex-grow: 1; padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
+        <button onclick="searchLocation()" style="background: #333; margin: 0;">🔍 Search</button>
+      </div>
+
+      <button onclick="toggleReport()">📍 Drop Pin</button>
+      <button onclick="copyCLEAR()">📋 Copy CLEAR Report</button>
+      <button onclick="logout()" style="background: #d9534f; float: right;">Logout</button>
+      <div id="status">Ready</div>
+    </div>
+    <div id="map"></div>
+
   <div id="main-app">
     <div class="controls">
       <h3>🛡️ Anonymous Community Map</h3>
@@ -205,6 +224,46 @@
       localStorage.removeItem('map_access_code');
       location.reload();
     }
+
+        // --- SEARCH LOGIC ---
+    async function searchLocation() {
+      const query = document.getElementById('searchInput').value;
+      if (!query) return;
+
+      setStatus('Searching...');
+      
+      try {
+        // Appends "Tampa, FL" to help the free geocoder prioritize local results
+        const searchQuery = encodeURIComponent(query + ", Tampa, FL");
+        
+        // Nominatim is OpenStreetMap's free geocoder. No API key required.
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${searchQuery}&limit=1`);
+        const data = await res.json();
+
+        if (data && data.length > 0) {
+          const lat = parseFloat(data[0].lat);
+          const lon = parseFloat(data[0].lon);
+          
+          // Fly the map to the location and zoom in (zoom level 16 is neighborhood level)
+          map.flyTo([lat, lon], 16, { animate: true, duration: 1.5 });
+          setStatus(`Found: ${data[0].display_name.split(',')[0]}`);
+          
+          // Optional: automatically turn on Drop Pin mode when they search
+          if (!dropMode) toggleReport(); 
+        } else {
+          setStatus('Location not found. Try a broader term.');
+        }
+      } catch (err) {
+        setStatus('Search error. Try zooming manually.');
+      }
+    }
+
+    // Allow pressing "Enter" in the search box to trigger the search
+    document.getElementById('searchInput').addEventListener('keypress', function (e) {
+      if (e.key === 'Enter') {
+        searchLocation();
+      }
+    });
 
     window.toggleReport = function toggleReport() {
       dropMode = !dropMode;
