@@ -1,7 +1,9 @@
 {
   "name": "anonymous-community-map",
   "version": "1.0.0",
+  "type": "module",
   "dependencies": {
-    "@upstash/redis": "^1.36.4"
+    "@upstash/redis": "^1.28.0"
   }
 }
+
