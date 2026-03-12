@@ -76,6 +76,8 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   
   <!-- APP LOGIC SCRIPT -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
   <script>
     const statusEl = document.getElementById('status');
     const clearBox = document.getElementById('clearReport');
@@ -83,9 +85,10 @@
     let map = null;
     let markers = null;
     let dropMode = false;
+    let userRole = "observer"; // Defaults to observer
 
     function initMap() {
-      if (map) return; // Don't initialize twice
+      if (map) return;
       map = L.map('map').setView([27.9506, -82.4572], 12);
       markers = L.layerGroup().addTo(map);
 
@@ -94,30 +97,29 @@
         attribution: '© OpenStreetMap contributors'
       }).addTo(map);
 
-      // Handle map clicks for dropping pins
       map.on('click', async (e) => {
         if (!dropMode) return;
         
-        const statusInput = prompt('Enter status (Type 1, 2, 3, or 4):\n1 = Reported\n2 = Under Verification\n3 = Confirmed\n4 = Resolved', '1');
-        if (!statusInput) { dropMode = false; setStatus('Ready'); return; }
-        
         let statusString = 'Reported';
-        if (statusInput === '2') statusString = 'Under Verification';
-        if (statusInput === '3') statusString = 'Confirmed';
-        if (statusInput === '4') statusString = 'Resolved';
+        
+        // Only ask admins what status to use. Observers default to "Reported".
+        if (userRole === 'admin') {
+          const statusInput = prompt('Enter status (1-4):\n1 = Reported\n2 = Under Verification\n3 = Confirmed\n4 = Resolved', '1');
+          if (!statusInput) { dropMode = false; setStatus('Ready'); return; }
+          if (statusInput === '2') statusString = 'Under Verification';
+          if (statusInput === '3') statusString = 'Confirmed';
+          if (statusInput === '4') statusString = 'Resolved';
+        }
 
         const message = prompt('Optional note (anonymous):') ?? '';
 
         try {
-          setStatus('Saving pin… (Location is being automatically fuzzed)');
+          setStatus('Saving pin…');
           const code = localStorage.getItem('map_access_code');
           
           const res = await fetch('/api/pins', {
             method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'x-access-code': code 
-            },
+            headers: { 'Content-Type': 'application/json', 'x-access-code': code },
             body: JSON.stringify({ lat: e.latlng.lat, lng: e.latlng.lng, message, status: statusString })
           });
           
@@ -125,13 +127,7 @@
           if (!res.ok) throw new Error(`POST failed: ${res.status}`);
           
           const pin = await res.json();
-
-          L.marker([pin.lat, pin.lng], { icon: getColoredIcon(pin.status) })
-            .addTo(markers)
-            .bindPopup(popupNode(pin))
-            .openPopup();
-
-          clearText.value = `Status: ${pin.status}\nLat: ${pin.lat.toFixed(4)}, Lng: ${pin.lng.toFixed(4)}\nNote: ${pin.description || '(none)'}`;
+          renderPin(pin);
           setStatus('Pin saved securely');
         } catch (err) {
           setStatus(`Error: ${err.message}`);
@@ -155,65 +151,97 @@
         iconSize: [25, 41],
         iconAnchor: [12, 41],
         popupAnchor: [1, -34],
-        shadowSize: [41, 41]
       });
     }
 
-    function popupNode(pin) {
+    // Function to physically draw a pin on the map
+    function renderPin(pin) {
       const div = document.createElement('div');
-      div.innerHTML = `
-        <strong>Status: ${pin.status || 'Reported'}</strong><br/>
+      
+      let html = `
+        <strong>Status: ${pin.status}</strong><br/>
         <span style="font-size: 0.9em; color: #555;">Note: ${pin.description || 'No note'}</span><br/>
         <span style="font-size: 0.8em; color: #888;">Reported: ${new Date(pin.createdAt).toLocaleTimeString()}</span>
       `;
-      return div;
+
+      // If they are an admin, inject Edit buttons into the popup!
+      if (userRole === 'admin') {
+        html += `<hr style="margin:5px 0;">
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <button onclick="updatePin('${pin.id}', 'Under Verification')" style="background:blue; color:white; border:none; padding:4px; font-size:12px; cursor:pointer;">Set: Verifying</button>
+            <button onclick="updatePin('${pin.id}', 'Confirmed')" style="background:red; color:white; border:none; padding:4px; font-size:12px; cursor:pointer;">Set: Confirmed</button>
+            <button onclick="updatePin('${pin.id}', 'Resolved')" style="background:green; color:white; border:none; padding:4px; font-size:12px; cursor:pointer;">Set: Resolved</button>
+          </div>`;
+      }
+      
+      div.innerHTML = html;
+
+      L.marker([pin.lat, pin.lng], { icon: getColoredIcon(pin.status) })
+        .addTo(markers)
+        .bindPopup(div);
     }
 
-    // --- LOGIN & DATA FETCHING LOGIC ---
+    // Function called by the new admin buttons
+    async function updatePin(id, newStatus) {
+      try {
+        setStatus(`Updating to ${newStatus}...`);
+        const code = localStorage.getItem('map_access_code');
+        
+        const res = await fetch('/api/pins', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'x-access-code': code },
+          body: JSON.stringify({ id, newStatus })
+        });
+
+        if (!res.ok) throw new Error('Failed to update pin');
+        
+        // Refresh the whole map to show the new colors
+        await loadPins(code);
+        setStatus('Status updated.');
+      } catch (e) {
+        setStatus(`Error: ${e.message}`);
+      }
+    }
+
+    async function loadPins(code) {
+      const res = await fetch('/api/pins', { headers: { 'x-access-code': code } });
+      if (res.status === 401) return false;
+      
+      const data = await res.json();
+      
+      // The server tells us if this password belongs to an admin or observer
+      userRole = data.role; 
+      
+      markers.clearLayers();
+      data.pins.forEach(p => renderPin(p));
+      return true;
+    }
+
     async function checkAccess() {
       const inputEl = document.getElementById('accessCodeInput');
       const errorEl = document.getElementById('login-error');
-      
-      // If they clicked the button, use the input box. Otherwise, check local storage.
       const code = inputEl.value || localStorage.getItem('map_access_code');
       if (!code) return;
       
       errorEl.textContent = "Checking credentials...";
       
       try {
-        const res = await fetch('/api/pins', {
-          headers: { 'x-access-code': code }
-        });
-        
-        if (res.status === 401) {
+        const success = await loadPins(code);
+        if (!success) {
           errorEl.textContent = "Incorrect access code.";
           localStorage.removeItem('map_access_code');
           return;
         }
         
-        if (!res.ok) {
-          errorEl.textContent = `Server error: ${res.status}`;
-          return;
-        }
-        
-        // --- SUCCESS! SHOW THE MAP ---
         localStorage.setItem('map_access_code', code);
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('main-app').style.display = 'block';
         
-        // Initialize map now that it is visible
         initMap();
         map.invalidateSize(); 
         
-        // Load the pins onto the map
-        const pins = await res.json();
-        markers.clearLayers();
-        pins.forEach(p => {
-          L.marker([p.lat, p.lng], { icon: getColoredIcon(p.status) })
-            .addTo(markers)
-            .bindPopup(popupNode(p));
-        });
-        setStatus('Ready');
+        // Show the role in the status bar so they know who they are logged in as
+        setStatus(`Ready (Logged in as: ${userRole})`);
 
       } catch (err) {
         errorEl.textContent = `Network error: ${err.message}`;
@@ -225,64 +253,15 @@
       location.reload();
     }
 
-        // --- SEARCH LOGIC ---
-    async function searchLocation() {
-      const query = document.getElementById('searchInput').value;
-      if (!query) return;
-
-      setStatus('Searching...');
-      
-      try {
-        // Appends "Tampa, FL" to help the free geocoder prioritize local results
-        const searchQuery = encodeURIComponent(query + ", Tampa, FL");
-        
-        // Nominatim is OpenStreetMap's free geocoder. No API key required.
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${searchQuery}&limit=1`);
-        const data = await res.json();
-
-        if (data && data.length > 0) {
-          const lat = parseFloat(data[0].lat);
-          const lon = parseFloat(data[0].lon);
-          
-          // Fly the map to the location and zoom in (zoom level 16 is neighborhood level)
-          map.flyTo([lat, lon], 16, { animate: true, duration: 1.5 });
-          setStatus(`Found: ${data[0].display_name.split(',')[0]}`);
-          
-          // Optional: automatically turn on Drop Pin mode when they search
-          if (!dropMode) toggleReport(); 
-        } else {
-          setStatus('Location not found. Try a broader term.');
-        }
-      } catch (err) {
-        setStatus('Search error. Try zooming manually.');
-      }
-    }
-
-    // Allow pressing "Enter" in the search box to trigger the search
-    document.getElementById('searchInput').addEventListener('keypress', function (e) {
-      if (e.key === 'Enter') {
-        searchLocation();
-      }
-    });
-
     window.toggleReport = function toggleReport() {
       dropMode = !dropMode;
-      setStatus(dropMode ? 'Drop mode: click map to add a pin' : 'Ready');
+      setStatus(dropMode ? 'Drop mode: click map to add a pin' : `Ready (Logged in as: ${userRole})`);
     };
 
-    window.copyCLEAR = async function copyCLEAR() {
-      clearBox.style.display = 'block';
-      clearText.select();
-      await navigator.clipboard.writeText(clearText.value);
-      setStatus('Copied');
-    };
-
-    // Auto-login check when page loads
     window.onload = () => {
-      if (localStorage.getItem('map_access_code')) {
-        checkAccess();
-      }
+      if (localStorage.getItem('map_access_code')) checkAccess();
     };
   </script>
+
 </body>
 </html>

@@ -51,3 +51,18 @@ export async function listPinsLast3Weeks() {
   
   return pins.filter(Boolean).map(pin => typeof pin === 'string' ? JSON.parse(pin) : pin);
 }
+
+// Add this at the bottom of api/lib/pinsKv.js
+export async function updatePinStatus(id, newStatus) {
+  const pinString = await redis.get(`pin:${id}`);
+  if (!pinString) throw new Error("Pin not found or expired.");
+  
+  // Parse the existing pin, change the status, and save it back
+  const pin = typeof pinString === 'string' ? JSON.parse(pinString) : pinString;
+  pin.status = newStatus;
+  
+  // We re-save it, but we use "KEEPTTL" so we don't accidentally reset its 4-hour countdown
+  await redis.set(`pin:${id}`, JSON.stringify(pin), { keepttl: true });
+  
+  return pin;
+}
