@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -38,8 +38,6 @@
   </div>
 
   <!-- MAIN APP -->
-
-  <!-- MAIN APP -->
   <div id="main-app">
     <div class="controls">
       <h3>🛡️ Anonymous Community Map</h3>
@@ -56,16 +54,6 @@
       <div id="status">Ready</div>
     </div>
     <div id="map"></div>
-
-  <div id="main-app">
-    <div class="controls">
-      <h3>🛡️ Anonymous Community Map</h3>
-      <button onclick="toggleReport()">📍 Drop Pin</button>
-      <button onclick="copyCLEAR()">📋 Copy CLEAR Report</button>
-      <button onclick="logout()" style="background: #d9534f; float: right;">Logout</button>
-      <div id="status">Ready</div>
-    </div>
-    <div id="map"></div>
     <div class="clear-report" id="clearReport" style="display:none;">
       <strong>CLEAR Report (copy to Signal):</strong><br>
       <textarea id="clearText" rows="4"></textarea>
@@ -76,19 +64,21 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   
   <!-- APP LOGIC SCRIPT -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  
   <script>
     const statusEl = document.getElementById('status');
     const clearBox = document.getElementById('clearReport');
     const clearText = document.getElementById('clearText');
+    
     let map = null;
     let markers = null;
     let dropMode = false;
     let userRole = "observer"; // Defaults to observer
 
+    function setStatus(msg) { statusEl.textContent = msg; }
+
     function initMap() {
-      if (map) return;
+      if (map !== null) return; // Prevent double initialization
+      
       map = L.map('map').setView([27.9506, -82.4572], 12);
       markers = L.layerGroup().addTo(map);
 
@@ -97,6 +87,7 @@
         attribution: '© OpenStreetMap contributors'
       }).addTo(map);
 
+      // Handle map clicks
       map.on('click', async (e) => {
         if (!dropMode) return;
         
@@ -137,8 +128,6 @@
       });
     }
 
-    function setStatus(msg) { statusEl.textContent = msg; }
-
     function getColoredIcon(status) {
       let color = 'blue'; 
       if (status === 'Reported') color = 'grey';
@@ -154,7 +143,6 @@
       });
     }
 
-    // Function to physically draw a pin on the map
     function renderPin(pin) {
       const div = document.createElement('div');
       
@@ -164,7 +152,7 @@
         <span style="font-size: 0.8em; color: #888;">Reported: ${new Date(pin.createdAt).toLocaleTimeString()}</span>
       `;
 
-      // If they are an admin, inject Edit buttons into the popup!
+      // If admin, show edit buttons
       if (userRole === 'admin') {
         html += `<hr style="margin:5px 0;">
           <div style="display:flex; flex-direction:column; gap:4px;">
@@ -181,7 +169,6 @@
         .bindPopup(div);
     }
 
-    // Function called by the new admin buttons
     async function updatePin(id, newStatus) {
       try {
         setStatus(`Updating to ${newStatus}...`);
@@ -195,7 +182,7 @@
 
         if (!res.ok) throw new Error('Failed to update pin');
         
-        // Refresh the whole map to show the new colors
+        // Refresh pins
         await loadPins(code);
         setStatus('Status updated.');
       } catch (e) {
@@ -205,15 +192,25 @@
 
     async function loadPins(code) {
       const res = await fetch('/api/pins', { headers: { 'x-access-code': code } });
-      if (res.status === 401) return false;
+      
+      if (res.status === 401) {
+        return false; // Wrong password
+      }
       
       const data = await res.json();
-      
-      // The server tells us if this password belongs to an admin or observer
       userRole = data.role; 
       
+      // Ensure map and markers exist before clearing
+      if (!markers) {
+        initMap(); 
+      }
+      
       markers.clearLayers();
-      data.pins.forEach(p => renderPin(p));
+      
+      if (data.pins && data.pins.length > 0) {
+        data.pins.forEach(p => renderPin(p));
+      }
+      
       return true;
     }
 
@@ -221,6 +218,7 @@
       const inputEl = document.getElementById('accessCodeInput');
       const errorEl = document.getElementById('login-error');
       const code = inputEl.value || localStorage.getItem('map_access_code');
+      
       if (!code) return;
       
       errorEl.textContent = "Checking credentials...";
@@ -237,16 +235,50 @@
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('main-app').style.display = 'block';
         
-        initMap();
-        map.invalidateSize(); 
+        // Map should be initialized by loadPins, just resize it
+        if (map) {
+          map.invalidateSize(); 
+        }
         
-        // Show the role in the status bar so they know who they are logged in as
         setStatus(`Ready (Logged in as: ${userRole})`);
 
       } catch (err) {
         errorEl.textContent = `Network error: ${err.message}`;
       }
     }
+
+    // Search Logic
+    async function searchLocation() {
+      const query = document.getElementById('searchInput').value;
+      if (!query) return;
+
+      setStatus('Searching...');
+      
+      try {
+        const searchQuery = encodeURIComponent(query + ", Tampa, FL");
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${searchQuery}&limit=1`);
+        const data = await res.json();
+
+        if (data && data.length > 0) {
+          const lat = parseFloat(data[0].lat);
+          const lon = parseFloat(data[0].lon);
+          map.flyTo([lat, lon], 16, { animate: true, duration: 1.5 });
+          setStatus(`Found: ${data[0].display_name.split(',')[0]}`);
+          if (!dropMode) toggleReport(); 
+        } else {
+          setStatus('Location not found. Try a broader term.');
+        }
+      } catch (err) {
+        setStatus('Search error. Try zooming manually.');
+      }
+    }
+
+    // Allow Enter key in search box
+    document.getElementById('searchInput')?.addEventListener('keypress', function (e) {
+      if (e.key === 'Enter') {
+        searchLocation();
+      }
+    });
 
     function logout() {
       localStorage.removeItem('map_access_code');
@@ -258,10 +290,16 @@
       setStatus(dropMode ? 'Drop mode: click map to add a pin' : `Ready (Logged in as: ${userRole})`);
     };
 
+    window.copyCLEAR = async function copyCLEAR() {
+      clearBox.style.display = 'block';
+      clearText.select();
+      await navigator.clipboard.writeText(clearText.value);
+      setStatus('Copied');
+    };
+
     window.onload = () => {
       if (localStorage.getItem('map_access_code')) checkAccess();
     };
   </script>
-
 </body>
 </html>
