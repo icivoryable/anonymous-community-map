@@ -1,13 +1,12 @@
 import { Redis } from "@upstash/redis";
 
-// This built-in function automatically finds the UPSTASH_REDIS_REST_URL 
-// and UPSTASH_REDIS_REST_TOKEN that Vercel just created for you.
 const redis = Redis.fromEnv();
 
-export const RETENTION_SECONDS = 60 * 60 * 24 * 21; // 3 weeks
+// Lowered TTL to 4 hours (14400 seconds) for operational security
+export const RETENTION_SECONDS = 14400; 
 export const RETENTION_MS = RETENTION_SECONDS * 1000;
+
 // Fuzzing function: shifts coordinates by up to ~300 meters
-// This ensures exact house/door numbers are NEVER stored
 function fuzzLocation(exactLat, exactLng) {
   const latOffset = (Math.random() - 0.5) * 0.003;
   const lngOffset = (Math.random() - 0.5) * 0.003;
@@ -17,11 +16,12 @@ function fuzzLocation(exactLat, exactLng) {
   };
 }
 
+// Ensure there is only ONE savePin function in this file
 export async function savePin({ lat, lng, description = "", status = "Reported" }) {
-  const id = crypto.randomUUID();
+  // Safe ID generator that won't crash on older Node versions
+  const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const createdAt = Date.now();
   
-  // Apply the fuzzing before creating the pin object
   const fuzzed = fuzzLocation(lat, lng);
   
   const pin = { 
@@ -29,7 +29,7 @@ export async function savePin({ lat, lng, description = "", status = "Reported" 
     lat: fuzzed.lat, 
     lng: fuzzed.lng, 
     description, 
-    status, // Added status tracking
+    status, 
     createdAt 
   };
   
@@ -39,6 +39,7 @@ export async function savePin({ lat, lng, description = "", status = "Reported" 
   return pin;
 }
 
+// Ensure there is only ONE listPinsLast3Weeks function in this file
 export async function listPinsLast3Weeks() {
   const now = Date.now();
   const cutoff = now - RETENTION_MS;
