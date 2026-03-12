@@ -7,77 +7,96 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   
   <style>
-    body { margin: 0; font-family: Arial, sans-serif; }
+    body { margin: 0; font-family: Arial, sans-serif; background-color: #ffffff; color: #111111; }
     #map { height: 70vh; width: 100%; }
-    .controls { padding: 10px; background: #f0f0f0; }
-    .clear-report { background: red; color: white; padding: 10px; margin: 10px 0; }
-    button { background: #007cba; color: white; border: none; padding: 10px 20px; margin: 5px; cursor: pointer; border-radius: 4px;}
-    textarea { width: 100%; box-sizing: border-box; }
+    .controls { padding: 10px; background: #e8e8e8; }
+    
+    /* Improved contrast for the CLEAR report box */
+    .clear-report { background: #b30000; color: #ffffff; padding: 10px; margin: 10px 0; }
+    
+    /* Improved button contrast to meet WCAG AA */
+    button { background: #005a87; color: #ffffff; border: none; padding: 10px 20px; margin: 5px; cursor: pointer; border-radius: 4px; font-weight: bold; }
+    button:hover { background: #004466; }
+    button:focus { outline: 3px solid #ffcc00; outline-offset: 2px; }
+    
+    .btn-logout { background: #b30000; }
+    .btn-logout:hover { background: #8a0000; }
 
-    /* Login Screen Styles */
+    textarea { width: 100%; box-sizing: border-box; font-family: monospace; padding: 8px; }
+
     #login-screen {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: white; z-index: 9999; display: flex; 
       flex-direction: column; align-items: center; justify-content: center;
     }
-    #login-screen input { padding: 10px; font-size: 16px; margin: 10px 0; width: 80%; max-width: 300px; border: 1px solid #ccc; border-radius: 4px;}
+    #login-screen input { padding: 10px; font-size: 16px; margin: 10px 0; width: 80%; max-width: 300px; border: 2px solid #555; border-radius: 4px;}
     
-    /* Hides the main app until they log in */
-    #main-app { display: none; } 
+    /* Hides the main app initially */
+    .hidden-screen { display: none !important; } 
   </style>
 </head>
 
 <body>
-  <!-- PASSWORD SCREEN -->
-  <div id="login-screen">
-    <h3>🛡️ Secure Access Required</h3>
-    <p>Enter dispatcher access code:</p>
-    <input type="password" id="accessCodeInput" placeholder="Access code..." />
-    <button onclick="checkAccess()">Enter</button>
-    <div id="login-error" style="color: red; margin-top: 10px; text-align: center; max-width: 80%;"></div>
-  </div>
 
-  <!-- MAIN APP -->
-  <div id="main-app">
-    <div class="controls">
-      <h3>🛡️ Anonymous Community Map</h3>
-      
-      <!-- NEW SEARCH BAR -->
-      <div style="margin-bottom: 10px; display: flex; gap: 5px;">
-        <input type="text" id="searchInput" placeholder="Search neighborhood or intersection..." style="flex-grow: 1; padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
-        <button onclick="searchLocation()" style="background: #333; margin: 0;">🔍 Search</button>
+  <!-- The <main> landmark satisfies the accessibility requirement -->
+  <main>
+    
+    <!-- PASSWORD SCREEN -->
+    <div id="login-screen" role="region" aria-label="Authentication">
+      <h3>🛡️ Secure Access Required</h3>
+      <label for="accessCodeInput" style="font-weight: bold; margin-bottom: 5px;">Enter dispatcher access code:</label>
+      <input type="password" id="accessCodeInput" placeholder="Access code..." aria-required="true" />
+      <button onclick="checkAccess()" aria-label="Submit access code">Enter</button>
+      <div id="login-error" role="alert" aria-live="assertive" style="color: #d90000; margin-top: 10px; text-align: center; font-weight: bold; max-width: 80%;"></div>
+    </div>
+
+    <!-- MAIN APP (Hidden initially with 'inert' to prevent focus) -->
+    <div id="main-app" class="hidden-screen" inert aria-hidden="true">
+      <div class="controls">
+        <h3>🛡️ Anonymous Community Map</h3>
+        
+        <div style="margin-bottom: 10px; display: flex; gap: 5px;">
+          <label for="searchInput" class="visually-hidden" style="display:none;">Search location</label>
+          <input type="text" id="searchInput" placeholder="Search neighborhood or intersection..." aria-label="Search for a neighborhood or intersection" style="flex-grow: 1; padding: 8px; border-radius: 4px; border: 2px solid #555;">
+          <button onclick="searchLocation()" style="background: #222222; margin: 0;" aria-label="Execute search">🔍 Search</button>
+        </div>
+
+        <button onclick="toggleReport()" aria-label="Toggle drop pin mode">📍 Drop Pin</button>
+        <button onclick="copyCLEAR()" aria-label="Copy CLEAR report to clipboard">📋 Copy CLEAR Report</button>
+        <button onclick="logout()" class="btn-logout" style="float: right;" aria-label="Log out of application">Logout</button>
+        <div id="status" role="status" aria-live="polite" style="font-weight: bold; margin-top: 8px;">Ready</div>
       </div>
-
-      <button onclick="toggleReport()">📍 Drop Pin</button>
-      <button onclick="copyCLEAR()">📋 Copy CLEAR Report</button>
-      <button onclick="logout()" style="background: #d9534f; float: right;">Logout</button>
-      <div id="status">Ready</div>
+      
+      <!-- Map Container -->
+      <div id="map" aria-label="Interactive incident map"></div>
+      
+      <!-- Report Textarea -->
+      <div class="clear-report hidden-screen" id="clearReport">
+        <label for="clearText" style="font-weight: bold;">CLEAR Report (copy to Signal):</label><br>
+        <textarea id="clearText" rows="4" readonly aria-readonly="true"></textarea>
+      </div>
     </div>
-    <div id="map"></div>
-    <div class="clear-report" id="clearReport" style="display:none;">
-      <strong>CLEAR Report (copy to Signal):</strong><br>
-      <textarea id="clearText" rows="4"></textarea>
-    </div>
-  </div>
 
-  <!-- LEAFLET SCRIPT -->
+  </main>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   
-  <!-- APP LOGIC SCRIPT -->
   <script>
     const statusEl = document.getElementById('status');
     const clearBox = document.getElementById('clearReport');
     const clearText = document.getElementById('clearText');
+    const loginScreen = document.getElementById('login-screen');
+    const mainApp = document.getElementById('main-app');
     
     let map = null;
     let markers = null;
     let dropMode = false;
-    let userRole = "observer"; // Defaults to observer
+    let userRole = "observer"; 
 
     function setStatus(msg) { statusEl.textContent = msg; }
 
     function initMap() {
-      if (map !== null) return; // Prevent double initialization
+      if (map !== null) return; 
       
       map = L.map('map').setView([27.9506, -82.4572], 12);
       markers = L.layerGroup().addTo(map);
@@ -87,13 +106,11 @@
         attribution: '© OpenStreetMap contributors'
       }).addTo(map);
 
-      // Handle map clicks
       map.on('click', async (e) => {
         if (!dropMode) return;
         
         let statusString = 'Reported';
         
-        // Only ask admins what status to use. Observers default to "Reported".
         if (userRole === 'admin') {
           const statusInput = prompt('Enter status (1-4):\n1 = Reported\n2 = Under Verification\n3 = Confirmed\n4 = Resolved', '1');
           if (!statusInput) { dropMode = false; setStatus('Ready'); return; }
@@ -148,17 +165,16 @@
       
       let html = `
         <strong>Status: ${pin.status}</strong><br/>
-        <span style="font-size: 0.9em; color: #555;">Note: ${pin.description || 'No note'}</span><br/>
-        <span style="font-size: 0.8em; color: #888;">Reported: ${new Date(pin.createdAt).toLocaleTimeString()}</span>
+        <span style="font-size: 0.9em; color: #111;">Note: ${pin.description || 'No note'}</span><br/>
+        <span style="font-size: 0.8em; color: #444;">Reported: ${new Date(pin.createdAt).toLocaleTimeString()}</span>
       `;
 
-      // If admin, show edit buttons
       if (userRole === 'admin') {
         html += `<hr style="margin:5px 0;">
           <div style="display:flex; flex-direction:column; gap:4px;">
-            <button onclick="updatePin('${pin.id}', 'Under Verification')" style="background:blue; color:white; border:none; padding:4px; font-size:12px; cursor:pointer;">Set: Verifying</button>
-            <button onclick="updatePin('${pin.id}', 'Confirmed')" style="background:red; color:white; border:none; padding:4px; font-size:12px; cursor:pointer;">Set: Confirmed</button>
-            <button onclick="updatePin('${pin.id}', 'Resolved')" style="background:green; color:white; border:none; padding:4px; font-size:12px; cursor:pointer;">Set: Resolved</button>
+            <button onclick="updatePin('${pin.id}', 'Under Verification')" style="background:#005a87; color:white; border:none; padding:4px; font-size:12px; cursor:pointer;" aria-label="Set status to Under Verification">Set: Verifying</button>
+            <button onclick="updatePin('${pin.id}', 'Confirmed')" style="background:#b30000; color:white; border:none; padding:4px; font-size:12px; cursor:pointer;" aria-label="Set status to Confirmed">Set: Confirmed</button>
+            <button onclick="updatePin('${pin.id}', 'Resolved')" style="background:#006600; color:white; border:none; padding:4px; font-size:12px; cursor:pointer;" aria-label="Set status to Resolved">Set: Resolved</button>
           </div>`;
       }
       
@@ -182,7 +198,6 @@
 
         if (!res.ok) throw new Error('Failed to update pin');
         
-        // Refresh pins
         await loadPins(code);
         setStatus('Status updated.');
       } catch (e) {
@@ -193,25 +208,31 @@
     async function loadPins(code) {
       const res = await fetch('/api/pins', { headers: { 'x-access-code': code } });
       
-      if (res.status === 401) {
-        return false; // Wrong password
-      }
+      if (res.status === 401) return false; 
       
       const data = await res.json();
       userRole = data.role; 
       
-      // Ensure map and markers exist before clearing
-      if (!markers) {
-        initMap(); 
-      }
+      if (!markers) initMap(); 
       
       markers.clearLayers();
-      
       if (data.pins && data.pins.length > 0) {
         data.pins.forEach(p => renderPin(p));
       }
-      
       return true;
+    }
+
+    // Securely switch between login screen and app
+    function showApp() {
+      // Hide login screen securely
+      loginScreen.classList.add('hidden-screen');
+      loginScreen.setAttribute('inert', '');
+      loginScreen.setAttribute('aria-hidden', 'true');
+      
+      // Show main app securely
+      mainApp.classList.remove('hidden-screen');
+      mainApp.removeAttribute('inert');
+      mainApp.setAttribute('aria-hidden', 'false');
     }
 
     async function checkAccess() {
@@ -232,14 +253,11 @@
         }
         
         localStorage.setItem('map_access_code', code);
-        document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('main-app').style.display = 'block';
         
-        // Map should be initialized by loadPins, just resize it
-        if (map) {
-          map.invalidateSize(); 
-        }
+        // Show the map and remove the login screen from accessibility tree
+        showApp();
         
+        if (map) map.invalidateSize(); 
         setStatus(`Ready (Logged in as: ${userRole})`);
 
       } catch (err) {
@@ -247,7 +265,6 @@
       }
     }
 
-    // Search Logic
     async function searchLocation() {
       const query = document.getElementById('searchInput').value;
       if (!query) return;
@@ -273,11 +290,13 @@
       }
     }
 
-    // Allow Enter key in search box
     document.getElementById('searchInput')?.addEventListener('keypress', function (e) {
-      if (e.key === 'Enter') {
-        searchLocation();
-      }
+      if (e.key === 'Enter') searchLocation();
+    });
+
+    // Ensure Enter key works on the login input as well
+    document.getElementById('accessCodeInput')?.addEventListener('keypress', function (e) {
+      if (e.key === 'Enter') checkAccess();
     });
 
     function logout() {
@@ -291,10 +310,10 @@
     };
 
     window.copyCLEAR = async function copyCLEAR() {
-      clearBox.style.display = 'block';
+      clearBox.classList.remove('hidden-screen');
       clearText.select();
       await navigator.clipboard.writeText(clearText.value);
-      setStatus('Copied');
+      setStatus('Copied to clipboard');
     };
 
     window.onload = () => {
