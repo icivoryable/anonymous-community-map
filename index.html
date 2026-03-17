@@ -93,12 +93,24 @@
       <input type="text" id="equipment" placeholder="e.g., White Ford F-150">
 
       <!-- THIS IS THE MISSING FIELD THAT CRASHED THE SUBMIT BUTTON! -->
-      <label for="resources">Resources Needed:</label>
+      <label for="resources">Resources:</label>
       <input type="text" id="resources" placeholder="e.g., Water, Medics, Tow Truck">
       
       <label for="actions">Observed Actions:</label>
       <textarea id="actions" rows="3" placeholder="e.g., Unloading materials..."></textarea>
       
+            <!-- Add this dropdown above your observed actions text area -->
+      <label for="priority">Encounter Type & Priority:</label>
+      <select id="priority">
+        <option value="Low">Low - Unknown / Suspicious Activity</option>
+        <option value="Medium">Medium - Local Police / Unmarked</option>
+        <option value="High">High - HCSO / PCSO / BCP / Federal</option>
+      </select>
+      
+      <label for="actions">Observed Actions:</label>
+      <textarea id="actions" rows="3" placeholder="e.g., Unloading materials..."></textarea>
+
+
       <div class="modal-buttons">
         <button class="btn-cancel" onclick="closeReportModal()">Cancel</button>
         <button onclick="submitReport()">Submit Report</button>
