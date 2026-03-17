@@ -78,7 +78,7 @@
 </head>
 
 <body>
-  <!-- REPORT ENTRY MODAL -->
+   <!-- REPORT ENTRY MODAL -->
   <div id="reportModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="reportModalTitle">
     <div class="modal-content">
       <h3 id="reportModalTitle">📝 Submit New Report</h3>
@@ -91,6 +91,10 @@
       
       <label for="equipment">Equipment/Vehicles:</label>
       <input type="text" id="equipment" placeholder="e.g., White Ford F-150">
+
+      <!-- THIS IS THE MISSING FIELD THAT CRASHED THE SUBMIT BUTTON! -->
+      <label for="resources">Resources Needed:</label>
+      <input type="text" id="resources" placeholder="e.g., Water, Medics, Tow Truck">
       
       <label for="actions">Observed Actions:</label>
       <textarea id="actions" rows="3" placeholder="e.g., Unloading materials..."></textarea>
@@ -101,6 +105,7 @@
       </div>
     </div>
   </div>
+
 
   <!-- COPY TEXT MODAL -->
   <div id="copyModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="copyModalTitle">
