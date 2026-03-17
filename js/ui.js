@@ -5,34 +5,72 @@ const clearText = document.getElementById('clearText');
 const loginScreen = document.getElementById('login-screen');
 const mainApp = document.getElementById('main-app');
 
-function setStatus(msg) { statusEl.textContent = msg; }
+function setStatus(msg) { 
+  if (statusEl) statusEl.textContent = msg; 
+}
 
 function showApp() {
-  loginScreen.classList.add('hidden-screen');
-  loginScreen.setAttribute('inert', '');
-  loginScreen.setAttribute('aria-hidden', 'true');
+  if (loginScreen) {
+    loginScreen.classList.add('hidden-screen');
+    loginScreen.setAttribute('inert', '');
+    loginScreen.setAttribute('aria-hidden', 'true');
+  }
   
-  mainApp.classList.remove('hidden-screen');
-  mainApp.removeAttribute('inert');
-  mainApp.setAttribute('aria-hidden', 'false');
+  if (mainApp) {
+    mainApp.classList.remove('hidden-screen');
+    mainApp.removeAttribute('inert');
+    mainApp.setAttribute('aria-hidden', 'false');
+  }
 }
+// Toggle the menu visibility
+window.toggleDropdown = function(event) {
+  // 1. Prevent the click from immediately bubbling up and triggering the close listener below
+  if (event) event.stopPropagation(); 
+  
+  const dropdown = document.getElementById("actionDropdown");
+  if (dropdown) {
+    // 2. We toggle the 'hidden-dropdown' class you added to your CSS
+    dropdown.classList.toggle("hidden-dropdown");
+  }
+};
+
+// Close the dropdown automatically if the user clicks anywhere outside of it
+document.addEventListener("click", function(event) {
+  const dropdown = document.getElementById("actionDropdown");
+  const menuContainer = document.getElementById("menuContainer");
+  
+  // If the dropdown exists and is NOT currently hidden...
+  if (dropdown && !dropdown.classList.contains("hidden-dropdown")) {
+    // And if they clicked somewhere outside the menu container entirely...
+    if (menuContainer && !menuContainer.contains(event.target)) {
+      dropdown.classList.add("hidden-dropdown"); // Hide it!
+    }
+  }
+});
+
 
 // Modal Functions
 function openReportModal() {
-  document.getElementById("reportModal").style.display = "flex";
+  const modal = document.getElementById("reportModal");
+  if (modal) modal.style.display = "flex";
 }
 
 function closeReportModal() {
-  document.getElementById("reportModal").style.display = "none";
+  const modal = document.getElementById("reportModal");
+  if (modal) modal.style.display = "none";
   
   // Clear the inputs
-  document.getElementById("count").value = "";
-  document.getElementById("location").value = "";
-  document.getElementById("equipment").value = "";
-  document.getElementById("actions").value = "";
-  document.getElementById("resources").value = "";
+  const fields = ["count", "location", "equipment", "actions", "resources"];
+  fields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
   
-  // Turn off drop mode and crosshairs if they cancel!
+  // Reset priority dropdown to Low
+  const priorityEl = document.getElementById("priority");
+  if (priorityEl) priorityEl.value = "Low";
+  
+  // Turn off drop mode and crosshairs if they cancel
   window.dropMode = false;
   const mapEl = document.getElementById('map');
   if (mapEl) mapEl.classList.remove('crosshair-mode');
@@ -44,19 +82,29 @@ function closeReportModal() {
 }
 
 function openCopyModal(text) {
-  document.getElementById("reportText").value = text;
-  document.getElementById("copyModal").style.display = "flex";
+  const reportText = document.getElementById("reportText");
+  if (reportText) reportText.value = text;
+  
+  const copyModal = document.getElementById("copyModal");
+  if (copyModal) copyModal.style.display = "flex";
 }
 
 function closeCopyModal() {
-  document.getElementById("copyModal").style.display = "none";
+  const copyModal = document.getElementById("copyModal");
+  if (copyModal) copyModal.style.display = "none";
 }
 
 async function copyReport() {
   const textarea = document.getElementById("reportText");
+  if (!textarea) return;
+  
   textarea.select();
-  await navigator.clipboard.writeText(textarea.value);
-  setStatus("Copied to clipboard!");
+  try {
+    await navigator.clipboard.writeText(textarea.value);
+    setStatus("Copied to clipboard!");
+  } catch (err) {
+    setStatus("Failed to copy. Please copy manually.");
+  }
 }
 
 function formatReport(r) {
@@ -68,8 +116,7 @@ R - Resources: ${r.resources || 'N/A'}
 [Report Time: ${new Date(r.createdAt || Date.now()).toLocaleTimeString()}]`;
 }
 
-// Function to generate and copy a master CLEAR report of ALL visible pins
-// Function to generate and copy a master CLEAR report of ACTIVE pins only
+// Function to generate and copy a master CLEAR report of ACTIVE pins only, sorted by priority
 window.copyCLEAR = async function copyCLEAR() {
   setStatus('Generating CLEAR report...');
   
@@ -81,10 +128,10 @@ window.copyCLEAR = async function copyCLEAR() {
 
   try {
     const res = await fetch('/api/pins', { headers: { 'x-access-code': code } });
-    const data = await res.json(); // <-- MUST be parsed before we filter it!
+    const data = await res.json(); 
     
     // FILTER: Only keep pins that are "Reported" or "Under Verification"
-    const reportedPins = data.pins ? data.pins.filter(p => p.status === 'Reported' || p.status === 'Under Verification') : [];
+    let reportedPins = data.pins ? data.pins.filter(p => p.status === 'Reported' || p.status === 'Under Verification') : [];
     
     if (reportedPins.length === 0) {
       alert("No active pins to report.");
@@ -92,14 +139,29 @@ window.copyCLEAR = async function copyCLEAR() {
       return;
     }
 
+    // Helper function to assign a numerical score to the priority
+    const getScore = (pin) => {
+      let reportData = {};
+      try { reportData = JSON.parse(pin.description); } catch(e) {}
+      const p = reportData.priority || 'Low';
+      if (p === 'High') return 3;
+      if (p === 'Medium') return 2;
+      return 1; // Low
+    };
+
+    // Sort the array: highest score (3) goes to the top
+    reportedPins.sort((a, b) => getScore(b) - getScore(a));
+
     let fullReport = "=== CLEAR REPORT ===\n\n";
     
-    // Loop through the FILTERED pins, not the raw data!
+    // Loop through the FILTERED and SORTED pins!
     reportedPins.forEach((pin, index) => {
       let reportData = { actions: pin.description }; 
       try { reportData = JSON.parse(pin.description); } catch(e) {}
       
-      fullReport += `[Incident ${index + 1} - Status: ${pin.status}]\n`;
+      const priorityLabel = reportData.priority || 'Low';
+      
+      fullReport += `[Incident ${index + 1} - PRIORITY: ${priorityLabel.toUpperCase()} - Status: ${pin.status}]\n`;
       fullReport += formatReport({ ...reportData, createdAt: pin.createdAt });
       fullReport += `\n----------------------\n`;
     });
@@ -113,9 +175,14 @@ window.copyCLEAR = async function copyCLEAR() {
 };
 
 // Authentication UI
-document.getElementById('accessCodeInput')?.addEventListener('keypress', function (e) {
-  if (e.key === 'Enter') window.checkAccess();
-});
+const accessInput = document.getElementById('accessCodeInput');
+if (accessInput) {
+  accessInput.addEventListener('keypress', function (e) {
+    if (e.key === 'Enter') {
+      if (typeof window.checkAccess === 'function') window.checkAccess();
+    }
+  });
+}
 
 function logout() {
   localStorage.removeItem('map_access_code');
@@ -123,12 +190,17 @@ function logout() {
 }
 
 window.onload = () => {
-  if (localStorage.getItem('map_access_code')) window.checkAccess();
+  if (localStorage.getItem('map_access_code')) {
+    if (typeof window.checkAccess === 'function') window.checkAccess();
+  }
 };
 
 // Function to search for an intersection or neighborhood and fly the map there
 window.searchLocation = async function searchLocation() {
-  const query = document.getElementById('searchInput').value;
+  const searchInput = document.getElementById('searchInput');
+  if (!searchInput) return;
+  
+  const query = searchInput.value;
   if (!query) return;
 
   setStatus('Searching...');
@@ -157,9 +229,12 @@ window.searchLocation = async function searchLocation() {
   }
 }
 
-document.getElementById('searchInput')?.addEventListener('keypress', function (e) {
-  if (e.key === 'Enter') {
-    e.preventDefault(); 
-    window.searchLocation();
-  }
-});
+const searchInputEl = document.getElementById('searchInput');
+if (searchInputEl) {
+  searchInputEl.addEventListener('keypress', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault(); 
+      window.searchLocation();
+    }
+  });
+}

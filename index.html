@@ -72,6 +72,49 @@
 .crosshair-mode {
   cursor: crosshair !important;
 }
+.top-right-menu {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1001; /* Must be > 1000 to float over Leaflet controls */
+}
+
+.menu-button {
+  background-color: #222;
+  color: white;
+  padding: 8px 15px;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+}
+
+.dropdown-content {
+  position: absolute;
+  right: 0;
+  top: 40px;
+  background-color: white;
+  min-width: 160px;
+  box-shadow: 0px 8px 16px rgba(0,0,0,0.2);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+}
+
+.dropdown-content button {
+  background: none;
+  color: black;
+  padding: 12px 16px;
+  text-align: left;
+  border: none;
+  border-bottom: 1px solid #ddd;
+  width: 100%;
+}
+
+.dropdown-content button:hover {
+  background-color: #f1f1f1;
+}
 
 
   </style>
@@ -160,7 +203,16 @@
         <button onclick="logout()" class="btn-logout" style="float: right;" aria-label="Log out of application">Logout</button>
         <div id="status" role="status" aria-live="polite" style="font-weight: bold; margin-top: 8px;">Ready</div>
       </div>
-      
+      <!-- Top Right Menu -->
+<div class="top-right-menu">
+  <button class="menu-button" onclick="toggleDropdown()">☰ Menu</button>
+  <div id="actionDropdown" class="dropdown-content" style="display: none;">
+    <button onclick="copyCLEAR()">📋 Copy CLEAR Report</button>
+    <button onclick="logout()">🚪 Logout</button>
+  </div>
+</div>
+
+
       <!-- Leaflet Map Container -->
       <div id="map" aria-label="Interactive incident map"></div>
       

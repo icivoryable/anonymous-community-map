@@ -1,4 +1,3 @@
-
 // --- js/map.js ---
 window.map = null;
 window.markers = null;
@@ -35,13 +34,17 @@ window.toggleReport = function toggleReport() {
   }
 }
 
-function getColoredIcon(status) {
-  let color = 'blue'; 
-  if (status === 'Reported') color = 'grey';
-  if (status === 'Under Verification') color = 'orange'; // Good to have this too!
-  if (status === 'Confirmed') color = 'red';
+// 1. COMBINED ICON FUNCTION (Priority + Status)
+function getPinIcon(status, priorityLevel) {
+  let color = 'blue'; // Default for Low priority
+  
+  // Set color based on Priority for active pins
+  if (priorityLevel === 'Medium') color = 'gold';
+  if (priorityLevel === 'High') color = 'red';
+  
+  // Override color if the pin is resolved or false!
   if (status === 'Resolved') color = 'green';
-  if (status === 'False') color = 'black'; // NEW: False reports turn black
+  if (status === 'False') color = 'black';
   
   return new L.Icon({
     iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
@@ -52,17 +55,20 @@ function getColoredIcon(status) {
   });
 }
 
-
 window.renderPin = function renderPin(pin) {
   const div = document.createElement('div');
   
   let reportData = { actions: pin.description }; 
   try { reportData = JSON.parse(pin.description); } catch(e) {}
   
+  // Grab the priority we saved, or default to 'Low'
+  const pinPriority = reportData.priority || 'Low'; 
+  
   const formattedText = formatReport({ ...reportData, createdAt: pin.createdAt });
 
   let html = `
     <strong>Status: ${pin.status}</strong><br/>
+    <strong>Priority: ${pinPriority}</strong><br/>
     <pre style="font-size: 0.8em; margin: 5px 0; white-space: pre-wrap; font-family: inherit;">${formattedText}</pre>
     <button onclick="openCopyModal(\`${formattedText.replace(/`/g, "'")}\`)" style="background: #222; width: 100%; margin: 5px 0 0 0;">📋 Copy This Report</button>
   `;
@@ -73,24 +79,14 @@ window.renderPin = function renderPin(pin) {
         <button onclick="updatePin('${pin.id}', 'Under Verification')" style="background:#005a87; color:white; border:none; padding:4px; font-size:12px;">Set: Verifying</button>
         <button onclick="updatePin('${pin.id}', 'Confirmed')" style="background:#b30000; color:white; border:none; padding:4px; font-size:12px;">Set: Confirmed</button>
         <button onclick="updatePin('${pin.id}', 'Resolved')" style="background:#006600; color:white; border:none; padding:4px; font-size:12px;">Set: Resolved</button>
-      </div>`;
-
-        if (userRole === 'admin') {
-    html += `<hr style="margin:5px 0;">
-      <div style="display:flex; flex-direction:column; gap:4px;">
-        <button onclick="updatePin('${pin.id}', 'Under Verification')" style="background:#005a87; color:white; border:none; padding:4px; font-size:12px;">Set: Verifying</button>
-        <button onclick="updatePin('${pin.id}', 'Confirmed')" style="background:#b30000; color:white; border:none; padding:4px; font-size:12px;">Set: Confirmed</button>
-        <button onclick="updatePin('${pin.id}', 'Resolved')" style="background:#006600; color:white; border:none; padding:4px; font-size:12px;">Set: Resolved</button>
-        <!-- NEW: False Report Button -->
         <button onclick="updatePin('${pin.id}', 'False')" style="background:#222222; color:white; border:none; padding:4px; font-size:12px;">Set: False Report</button>
       </div>`;
-  }
-
   }
   
   div.innerHTML = html;
 
-  L.marker([pin.lat, pin.lng], { icon: getColoredIcon(pin.status) })
+  // Create marker using the new combined function
+  L.marker([pin.lat, pin.lng], { icon: getPinIcon(pin.status, pinPriority) })
     .addTo(window.markers)
     .bindPopup(div);
 }
@@ -118,7 +114,7 @@ window.updateRecentList = function(pins) {
   list.innerHTML = "";
   
   pins.slice(-5).reverse().forEach(pin => {
-    let reportData = { actions: pin.description, location: "Unknown" }; 
+    let reportData = { actions: pin.description };
     try { reportData = JSON.parse(pin.description); } catch(e) {}
     
     const formattedText = formatReport({ ...reportData, createdAt: pin.createdAt });
