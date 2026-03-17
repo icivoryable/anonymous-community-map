@@ -115,6 +115,41 @@
 .dropdown-content button:hover {
   background-color: #f1f1f1;
 }
+/* 1. Map Margins and Border */
+#map {
+  margin: 15px;
+  border: 4px solid #333;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  height: calc(100vh - 120px); /* Adjusts height so it doesn't scroll off-screen */
+  box-sizing: border-box;
+}
+
+/* 2. Flashing / Pulsing animation for High Priority Pins */
+.pulse-high-priority {
+  animation: pulsate 1s infinite alternate;
+}
+@keyframes pulsate {
+  0% { transform: scale(1); filter: drop-shadow(0 0 2px red); }
+  100% { transform: scale(1.15); filter: drop-shadow(0 0 12px red); }
+}
+
+/* 3. Greyed-out Disabled Submit Button */
+#submitReportBtn:disabled {
+  background-color: #cccccc !important;
+  color: #666666 !important;
+  cursor: not-allowed;
+}
+
+/* 4. Empty Form Error Message */
+.error-msg {
+  color: #d32f2f;
+  font-size: 13px;
+  font-weight: bold;
+  display: none;
+  margin-bottom: 10px;
+  text-align: center;
+}
 
 
   </style>

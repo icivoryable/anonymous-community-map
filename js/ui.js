@@ -22,14 +22,13 @@ function showApp() {
     mainApp.setAttribute('aria-hidden', 'false');
   }
 }
+
 // Toggle the menu visibility
 window.toggleDropdown = function(event) {
-  // 1. Prevent the click from immediately bubbling up and triggering the close listener below
   if (event) event.stopPropagation(); 
   
   const dropdown = document.getElementById("actionDropdown");
   if (dropdown) {
-    // 2. We toggle the 'hidden-dropdown' class you added to your CSS
     dropdown.classList.toggle("hidden-dropdown");
   }
 };
@@ -39,20 +38,53 @@ document.addEventListener("click", function(event) {
   const dropdown = document.getElementById("actionDropdown");
   const menuContainer = document.getElementById("menuContainer");
   
-  // If the dropdown exists and is NOT currently hidden...
   if (dropdown && !dropdown.classList.contains("hidden-dropdown")) {
-    // And if they clicked somewhere outside the menu container entirely...
     if (menuContainer && !menuContainer.contains(event.target)) {
-      dropdown.classList.add("hidden-dropdown"); // Hide it!
+      dropdown.classList.add("hidden-dropdown");
     }
   }
 });
 
 
-// Modal Functions
+// --- FORM VALIDATION ---
+function validateForm() {
+  const fields = ["count", "location", "equipment", "actions", "resources"];
+  
+  // Check if at least one text box has text in it
+  const hasData = fields.some(id => {
+    const el = document.getElementById(id);
+    return el && el.value.trim() !== "";
+  });
+  
+  const submitBtn = document.getElementById("submitReportBtn");
+  const errorMsg = document.getElementById("reportError");
+  
+  if (submitBtn) {
+    submitBtn.disabled = !hasData; // Disables button if false
+  }
+  if (errorMsg) {
+    errorMsg.style.display = hasData ? "none" : "block"; // Shows error if empty
+  }
+}
+
+
+// --- MODAL FUNCTIONS ---
 function openReportModal() {
   const modal = document.getElementById("reportModal");
   if (modal) modal.style.display = "flex";
+  
+  // Run validation immediately so the button starts disabled
+  validateForm();
+  
+  // Listen for typing in any of the fields
+  const fields = ["count", "location", "equipment", "actions", "resources"];
+  fields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.removeEventListener('input', validateForm); // Prevent duplicates
+      el.addEventListener('input', validateForm);
+    }
+  });
 }
 
 function closeReportModal() {

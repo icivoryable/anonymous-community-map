@@ -34,24 +34,32 @@ window.toggleReport = function toggleReport() {
   }
 }
 
-// 1. COMBINED ICON FUNCTION (Priority + Status)
+// 1. Updated Icon Function (Fixes colors and adds pulsing animation)
 function getPinIcon(status, priorityLevel) {
-  let color = 'blue'; // Default for Low priority
+  let color = 'blue'; 
   
-  // Set color based on Priority for active pins
   if (priorityLevel === 'Medium') color = 'gold';
   if (priorityLevel === 'High') color = 'red';
   
-  // Override color if the pin is resolved or false!
+  // Status overrides colors
+  if (status === 'Under Verification') color = 'orange';
+  if (status === 'Confirmed') color = 'darkred'; // Differentiates from standard red
   if (status === 'Resolved') color = 'green';
   if (status === 'False') color = 'black';
   
+  // If it's High Priority AND still active, make it pulse!
+  let cssClass = '';
+  if (priorityLevel === 'High' && status !== 'Resolved' && status !== 'False') {
+    cssClass = 'pulse-high-priority';
+  }
+
   return new L.Icon({
     iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
     iconSize: [25, 41],
     iconAnchor: [12, 41],
     popupAnchor: [1, -34],
+    className: cssClass // Adds the animation class
   });
 }
 
@@ -91,23 +99,7 @@ window.renderPin = function renderPin(pin) {
     .bindPopup(div);
 }
 
-window.loadPins = async function loadPins(code) {
-  const res = await fetch('/api/pins', { headers: { 'x-access-code': code } });
-  if (res.status === 401) return false; 
-  
-  const data = await res.json();
-  userRole = data.role; 
-  
-  if (window.markers) {
-    window.markers.clearLayers();
-    if (data.pins && data.pins.length > 0) {
-      data.pins.forEach(p => window.renderPin(p));
-      window.updateRecentList(data.pins);
-    }
-  }
-  return true;
-}
-
+// 2. Updated Recent List (Adds bolding and emojis based on priority)
 window.updateRecentList = function(pins) {
   const list = document.getElementById("recentList");
   if (!list) return;
@@ -118,6 +110,12 @@ window.updateRecentList = function(pins) {
     try { reportData = JSON.parse(pin.description); } catch(e) {}
     
     const formattedText = formatReport({ ...reportData, createdAt: pin.createdAt });
+    const pinPriority = reportData.priority || 'Low';
+    
+    // Choose the icon/bolding for the recent list
+    let priorityLabel = '🔵 ';
+    if (pinPriority === 'Medium') priorityLabel = '🟡 <strong>MED:</strong> ';
+    if (pinPriority === 'High') priorityLabel = '🔴 <strong>HIGH:</strong> ';
     
     const div = document.createElement("div");
     div.style.padding = "8px 5px";
@@ -127,7 +125,8 @@ window.updateRecentList = function(pins) {
     div.style.alignItems = "center";
     
     const textSpan = document.createElement("span");
-    textSpan.innerText = `📍 ${reportData.location || 'Reported Location'} – ${new Date(pin.createdAt).toLocaleTimeString()}`;
+    // Inserted the priority label!
+    textSpan.innerHTML = `${priorityLabel} ${reportData.location || 'Reported Location'} – ${new Date(pin.createdAt).toLocaleTimeString()}`;
     
     const copyBtn = document.createElement("button");
     copyBtn.innerText = "📋 Copy";
@@ -144,4 +143,21 @@ window.updateRecentList = function(pins) {
     div.appendChild(copyBtn);
     list.appendChild(div);
   });
+}
+
+window.loadPins = async function loadPins(code) {
+  const res = await fetch('/api/pins', { headers: { 'x-access-code': code } });
+  if (res.status === 401) return false; 
+  
+  const data = await res.json();
+  userRole = data.role; 
+  
+  if (window.markers) {
+    window.markers.clearLayers();
+    if (data.pins && data.pins.length > 0) {
+      data.pins.forEach(p => window.renderPin(p));
+      window.updateRecentList(data.pins);
+    }
+  }
+  return true;
 }
