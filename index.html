@@ -4,11 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Anonymous Community Map</title>
+  
+  <!-- Leaflet CSS must load before the map initializes -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   
   <style>
     body { margin: 0; font-family: Arial, sans-serif; background-color: #ffffff; color: #111111; }
+    
+    /* CRITICAL FIX: The map must have an explicit height and position for Leaflet to measure it */
     #map { height: 70vh; min-height: 400px; width: 100%; position: relative; }
+    
     .controls { padding: 10px; background: #e8e8e8; }
     
     /* Improved contrast for the CLEAR report box */
@@ -24,6 +29,7 @@
 
     textarea { width: 100%; box-sizing: border-box; font-family: monospace; padding: 8px; }
 
+    /* Security: Login Screen Overlay */
     #login-screen {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: white; z-index: 9999; display: flex; 
@@ -31,88 +37,80 @@
     }
     #login-screen input { padding: 10px; font-size: 16px; margin: 10px 0; width: 80%; max-width: 300px; border: 2px solid #555; border-radius: 4px;}
     
-    /* Hides the main app initially */
+    /* Hides the main app initially for security */
     .hidden-screen { display: none !important; } 
 
     /* Modal Overlay Background */
-.modal-overlay {
-  display: none; /* Hidden by default, toggled to flex by JS */
-  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0, 0, 0, 0.6);
-  z-index: 10000;
-  align-items: center; justify-content: center;
-}
+    .modal-overlay {
+      display: none; /* Hidden by default, toggled to flex by JS */
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 10000;
+      align-items: center; justify-content: center;
+    }
 
-/* Modal Content Box */
-.modal-content {
-  background: white; padding: 20px; border-radius: 8px;
-  width: 90%; max-width: 400px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-}
+    /* Modal Content Box */
+    .modal-content {
+      background: white; padding: 20px; border-radius: 8px;
+      width: 90%; max-width: 400px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
 
-.modal-content h3 { margin-top: 0; }
-.modal-content label { font-weight: bold; display: block; margin-top: 10px; }
-.modal-content input, .modal-content textarea { 
-  width: 100%; padding: 8px; margin-top: 5px; 
-  box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;
-}
-.modal-buttons { margin-top: 15px; display: flex; justify-content: flex-end; gap: 10px; }
+    .modal-content h3 { margin-top: 0; }
+    .modal-content label { font-weight: bold; display: block; margin-top: 10px; }
+    .modal-content input, .modal-content textarea { 
+      width: 100%; padding: 8px; margin-top: 5px; 
+      box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;
+    }
+    .modal-buttons { margin-top: 15px; display: flex; justify-content: flex-end; gap: 10px; }
 
-/* Cancel Button Style */
-.btn-cancel { background: #666; }
-.btn-cancel:hover { background: #444; }
+    /* Cancel Button Style */
+    .btn-cancel { background: #666; }
+    .btn-cancel:hover { background: #444; }
 
   </style>
 </head>
 
 <body>
-<!-- REPORT ENTRY MODAL -->
-<div id="reportModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="reportModalTitle">
-  <div class="modal-content">
-    <h3 id="reportModalTitle">📝 Submit New Report</h3>
-    
-    <label for="count">Count (How many?):</label>
-    <input type="text" id="count" placeholder="e.g., 2 people, 1 vehicle">
-    
-    <label for="location">Location Details:</label>
-    <input type="text" id="location" placeholder="e.g., NE corner of intersection">
-    
-    <label for="equipment">Equipment/Vehicles:</label>
-    <input type="text" id="equipment" placeholder="e.g., White Ford F-150">
-    
-    <label for="actions">Observed Actions:</label>
-    <textarea id="actions" rows="3" placeholder="e.g., Unloading materials..."></textarea>
-    
-    <div class="modal-buttons">
-      <button class="btn-cancel" onclick="closeReportModal()">Cancel</button>
-      <button onclick="submitReport()">Submit Report</button>
+  <!-- REPORT ENTRY MODAL -->
+  <div id="reportModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="reportModalTitle">
+    <div class="modal-content">
+      <h3 id="reportModalTitle">📝 Submit New Report</h3>
+      
+      <label for="count">Count (How many?):</label>
+      <input type="text" id="count" placeholder="e.g., 2 people, 1 vehicle">
+      
+      <label for="location">Location Details:</label>
+      <input type="text" id="location" placeholder="e.g., NE corner of intersection">
+      
+      <label for="equipment">Equipment/Vehicles:</label>
+      <input type="text" id="equipment" placeholder="e.g., White Ford F-150">
+      
+      <label for="actions">Observed Actions:</label>
+      <textarea id="actions" rows="3" placeholder="e.g., Unloading materials..."></textarea>
+      
+      <div class="modal-buttons">
+        <button class="btn-cancel" onclick="closeReportModal()">Cancel</button>
+        <button onclick="submitReport()">Submit Report</button>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- COPY TEXT MODAL -->
-<div id="copyModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="copyModalTitle">
-  <div class="modal-content">
-    <h3 id="copyModalTitle">📋 Formatted Report</h3>
-    
-    <textarea id="reportText" rows="6" readonly aria-readonly="true"></textarea>
-    
-    <div class="modal-buttons">
-      <button class="btn-cancel" onclick="closeCopyModal()">Close</button>
-      <button onclick="copyReport()">Copy to Clipboard</button>
+  <!-- COPY TEXT MODAL -->
+  <div id="copyModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="copyModalTitle">
+    <div class="modal-content">
+      <h3 id="copyModalTitle">📋 Formatted Report</h3>
+      
+      <textarea id="reportText" rows="6" readonly aria-readonly="true"></textarea>
+      
+      <div class="modal-buttons">
+        <button class="btn-cancel" onclick="closeCopyModal()">Close</button>
+        <button onclick="copyReport()">Copy to Clipboard</button>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- RECENT REPORTS LIST (Optional sidebar/footer) -->
-<div id="recentContainer" style="padding: 10px; background: #f9f9f9; border-top: 2px solid #ccc;">
-  <h4>Recent Reports</h4>
-  <div id="recentList" style="font-size: 0.9em; color: #444;">
-    <!-- JavaScript will populate this list -->
-  </div>
-</div>
-
-  <!-- The <main> landmark satisfies the accessibility requirement -->
+  <!-- MAIN APP LANDMARK -->
   <main>
     
     <!-- PASSWORD SCREEN -->
@@ -124,7 +122,7 @@
       <div id="login-error" role="alert" aria-live="assertive" style="color: #d90000; margin-top: 10px; text-align: center; font-weight: bold; max-width: 80%;"></div>
     </div>
 
-    <!-- MAIN APP (Hidden initially with 'inert' to prevent focus) -->
+    <!-- MAIN APP CONTROLS (Hidden initially) -->
     <div id="main-app" class="hidden-screen" inert aria-hidden="true">
       <div class="controls">
         <h3>🛡️ Anonymous Community Map</h3>
@@ -132,261 +130,36 @@
         <div style="margin-bottom: 10px; display: flex; gap: 5px;">
           <label for="searchInput" class="visually-hidden" style="display:none;">Search location</label>
           <input type="text" id="searchInput" placeholder="Search neighborhood or intersection..." aria-label="Search for a neighborhood or intersection" style="flex-grow: 1; padding: 8px; border-radius: 4px; border: 2px solid #555;">
-          <button onclick="searchLocation()" style="background: #222222; margin: 0;" aria-label="Execute search">🔍 Search</button>
+          <button onclick="window.searchLocation()" style="background: #222222; margin: 0;" aria-label="Execute search">🔍 Search</button>
         </div>
 
         <button onclick="toggleReport()" aria-label="Toggle drop pin mode">📍 Drop Pin</button>
-        <button onclick="copyCLEAR()" aria-label="Copy CLEAR report to clipboard">📋 Copy CLEAR Report</button>
         <button onclick="logout()" class="btn-logout" style="float: right;" aria-label="Log out of application">Logout</button>
         <div id="status" role="status" aria-live="polite" style="font-weight: bold; margin-top: 8px;">Ready</div>
       </div>
       
-      <!-- Map Container -->
+      <!-- Leaflet Map Container -->
       <div id="map" aria-label="Interactive incident map"></div>
       
-      <!-- Report Textarea -->
-      <div class="clear-report hidden-screen" id="clearReport">
-        <label for="clearText" style="font-weight: bold;">CLEAR Report (copy to Signal):</label><br>
-        <textarea id="clearText" rows="4" readonly aria-readonly="true"></textarea>
+      <!-- RECENT REPORTS LIST -->
+      <div id="recentContainer" style="padding: 10px; background: #f9f9f9; border-top: 2px solid #ccc;">
+        <h4>Recent Reports</h4>
+        <div id="recentList" style="font-size: 0.9em; color: #444;">
+          <!-- JavaScript will populate this list -->
+        </div>
       </div>
-    </div>
 
+    </div>
   </main>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  
-  <script>
-    const statusEl = document.getElementById('status');
-    const clearBox = document.getElementById('clearReport');
-    const clearText = document.getElementById('clearText');
-    const loginScreen = document.getElementById('login-screen');
-    const mainApp = document.getElementById('main-app');
-    
-    let map = null;
-    let markers = null;
-    let dropMode = false;
-    let userRole = "observer"; 
-
-    function setStatus(msg) { statusEl.textContent = msg; }
-
-    function initMap() {
-      if (map !== null) return; 
-      
-      map = L.map('map').setView([27.9506, -82.4572], 12);
-      markers = L.layerGroup().addTo(map);
-
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '© OpenStreetMap contributors'
-      }).addTo(map);
-
-      map.on('click', async (e) => {
-        if (!dropMode) return;
-        
-        let statusString = 'Reported';
-        
-        if (userRole === 'admin') {
-          const statusInput = prompt('Enter status (1-4):\n1 = Reported\n2 = Under Verification\n3 = Confirmed\n4 = Resolved', '1');
-          if (!statusInput) { dropMode = false; setStatus('Ready'); return; }
-          if (statusInput === '2') statusString = 'Under Verification';
-          if (statusInput === '3') statusString = 'Confirmed';
-          if (statusInput === '4') statusString = 'Resolved';
-        }
-
-        const message = prompt('Optional note (anonymous):') ?? '';
-
-        try {
-          setStatus('Saving pin…');
-          const code = localStorage.getItem('map_access_code');
-          
-          const res = await fetch('/api/pins', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-access-code': code },
-            body: JSON.stringify({ lat: e.latlng.lat, lng: e.latlng.lng, message, status: statusString })
-          });
-          
-          if (res.status === 401) { logout(); return; }
-          if (!res.ok) throw new Error(`POST failed: ${res.status}`);
-          
-          const pin = await res.json();
-          renderPin(pin);
-          setStatus('Pin saved securely');
-        } catch (err) {
-          setStatus(`Error: ${err.message}`);
-        } finally {
-          dropMode = false;
-        }
-      });
-    }
-
-    function getColoredIcon(status) {
-      let color = 'blue'; 
-      if (status === 'Reported') color = 'grey';
-      if (status === 'Confirmed') color = 'red';
-      if (status === 'Resolved') color = 'green';
-      
-      return new L.Icon({
-        iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-        popupAnchor: [1, -34],
-      });
-    }
-
-    function renderPin(pin) {
-      const div = document.createElement('div');
-      
-      let html = `
-        <strong>Status: ${pin.status}</strong><br/>
-        <span style="font-size: 0.9em; color: #111;">Note: ${pin.description || 'No note'}</span><br/>
-        <span style="font-size: 0.8em; color: #444;">Reported: ${new Date(pin.createdAt).toLocaleTimeString()}</span>
-      `;
-
-      if (userRole === 'admin') {
-        html += `<hr style="margin:5px 0;">
-          <div style="display:flex; flex-direction:column; gap:4px;">
-            <button onclick="updatePin('${pin.id}', 'Under Verification')" style="background:#005a87; color:white; border:none; padding:4px; font-size:12px; cursor:pointer;" aria-label="Set status to Under Verification">Set: Verifying</button>
-            <button onclick="updatePin('${pin.id}', 'Confirmed')" style="background:#b30000; color:white; border:none; padding:4px; font-size:12px; cursor:pointer;" aria-label="Set status to Confirmed">Set: Confirmed</button>
-            <button onclick="updatePin('${pin.id}', 'Resolved')" style="background:#006600; color:white; border:none; padding:4px; font-size:12px; cursor:pointer;" aria-label="Set status to Resolved">Set: Resolved</button>
-          </div>`;
-      }
-      
-      div.innerHTML = html;
-
-      L.marker([pin.lat, pin.lng], { icon: getColoredIcon(pin.status) })
-        .addTo(markers)
-        .bindPopup(div);
-    }
-
-    async function updatePin(id, newStatus) {
-      try {
-        setStatus(`Updating to ${newStatus}...`);
-        const code = localStorage.getItem('map_access_code');
-        
-        const res = await fetch('/api/pins', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', 'x-access-code': code },
-          body: JSON.stringify({ id, newStatus })
-        });
-
-        if (!res.ok) throw new Error('Failed to update pin');
-        
-        await loadPins(code);
-        setStatus('Status updated.');
-      } catch (e) {
-        setStatus(`Error: ${e.message}`);
-      }
-    }
-
-    async function loadPins(code) {
-      const res = await fetch('/api/pins', { headers: { 'x-access-code': code } });
-      
-      if (res.status === 401) return false; 
-      
-      const data = await res.json();
-      userRole = data.role; 
-      
-      if (!markers) initMap(); 
-      
-      markers.clearLayers();
-      if (data.pins && data.pins.length > 0) {
-        data.pins.forEach(p => renderPin(p));
-      }
-      return true;
-    }
-
-    // Securely switch between login screen and app
-    function showApp() {
-      // Hide login screen securely
-      loginScreen.classList.add('hidden-screen');
-      loginScreen.setAttribute('inert', '');
-      loginScreen.setAttribute('aria-hidden', 'true');
-      
-      // Show main app securely
-      mainApp.classList.remove('hidden-screen');
-      mainApp.removeAttribute('inert');
-      mainApp.setAttribute('aria-hidden', 'false');
-    }
-
-    async function checkAccess() {
-      const inputEl = document.getElementById('accessCodeInput');
-      const errorEl = document.getElementById('login-error');
-      const code = inputEl.value || localStorage.getItem('map_access_code');
-      
-      if (!code) return;
-      
-      errorEl.textContent = "Checking credentials...";
-      
-      try {
-        const success = await loadPins(code);
-        if (!success) {
-          errorEl.textContent = "Incorrect access code.";
-          localStorage.removeItem('map_access_code');
-          return;
-        }
-        
-        localStorage.setItem('map_access_code', code);
-        
-        // Show the map and remove the login screen from accessibility tree
-        showApp();
-        
-        if (map) map.invalidateSize(); 
-        setStatus(`Ready (Logged in as: ${userRole})`);
-
-      } catch (err) {
-        errorEl.textContent = `Network error: ${err.message}`;
-      }
-    }
-
-    async function searchLocation() {
-      const query = document.getElementById('searchInput').value;
-      if (!query) return;
-
-      setStatus('Searching...');
-      
-      try {
-        const searchQuery = encodeURIComponent(query + ", Tampa, FL");
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${searchQuery}&limit=1`);
-        const data = await res.json();
-
-        if (data && data.length > 0) {
-          const lat = parseFloat(data[0].lat);
-          const lon = parseFloat(data[0].lon);
-          map.flyTo([lat, lon], 16, { animate: true, duration: 1.5 });
-          setStatus(`Found: ${data[0].display_name.split(',')[0]}`);
-          if (!dropMode) toggleReport(); 
-        } else {
-          setStatus('Location not found. Try a broader term.');
-        }
-      } catch (err) {
-        setStatus('Search error. Try zooming manually.');
-      }
-    }
-
-    document.getElementById('searchInput')?.addEventListener('keypress', function (e) {
-      if (e.key === 'Enter') searchLocation();
-    });
-
-    // Ensure Enter key works on the login input as well
-    document.getElementById('accessCodeInput')?.addEventListener('keypress', function (e) {
-      if (e.key === 'Enter') checkAccess();
-    });
-
-    function logout() {
-      localStorage.removeItem('map_access_code');
-      location.reload();
-    }
-
-    window.onload = () => {
-      if (localStorage.getItem('map_access_code')) checkAccess();
-    };
-  </script>
+  <!-- SCRIPTS: Order matters! Leaflet must load before your custom scripts -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="/js/ui.js"></script>
   <script src="/js/privacy.js"></script>
   <script src="/js/storage.js"></script>
   <script src="/js/map.js"></script>
+
 </body>
 </html>
+
 
