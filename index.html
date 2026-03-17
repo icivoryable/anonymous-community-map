@@ -11,9 +11,6 @@
   <style>
     body { margin: 0; font-family: Arial, sans-serif; background-color: #ffffff; color: #111111; }
     
-    /* CRITICAL FIX: The map must have an explicit height and position for Leaflet to measure it */
-    #map { height: 70vh; min-height: 400px; width: 100%; position: relative; }
-    
     .controls { padding: 10px; background: #e8e8e8; }
     
     /* Improved contrast for the CLEAR report box */
@@ -42,7 +39,7 @@
 
     /* Modal Overlay Background */
     .modal-overlay {
-      display: none; /* Hidden by default, toggled to flex by JS */
+      display: none; 
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(0, 0, 0, 0.6);
       z-index: 10000;
@@ -58,7 +55,7 @@
 
     .modal-content h3 { margin-top: 0; }
     .modal-content label { font-weight: bold; display: block; margin-top: 10px; }
-    .modal-content input, .modal-content textarea { 
+    .modal-content input, .modal-content textarea, .modal-content select { 
       width: 100%; padding: 8px; margin-top: 5px; 
       box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;
     }
@@ -69,94 +66,105 @@
     .btn-cancel:hover { background: #444; }
 
     /* Custom cursor for dropping pins */
-.crosshair-mode {
-  cursor: crosshair !important;
-}
-.top-right-menu {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 1001; /* Must be > 1000 to float over Leaflet controls */
-}
+    .crosshair-mode { cursor: crosshair !important; }
 
-.menu-button {
-  background-color: #222;
-  color: white;
-  padding: 8px 15px;
-  border: none;
-  border-radius: 4px;
-  font-size: 16px;
-  cursor: pointer;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-}
+    /* 1. Map Margins and Border */
+    #map {
+      margin: 15px;
+      border: 4px solid #333;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      height: 60vh;
+      min-height: 400px; 
+      width: calc(100% - 30px);
+      position: relative;
+      box-sizing: border-box;
+    }
 
-.dropdown-content {
-  position: absolute;
-  right: 0;
-  top: 40px;
-  background-color: white;
-  min-width: 160px;
-  box-shadow: 0px 8px 16px rgba(0,0,0,0.2);
-  border-radius: 4px;
-  display: flex;
-  flex-direction: column;
-}
+    /* 2. Flashing / Pulsing animation for High Priority Pins */
+    .pulse-high-priority {
+      animation: pulsate 1s infinite alternate;
+    }
+    @keyframes pulsate {
+      0% { transform: scale(1); filter: drop-shadow(0 0 2px red); }
+      100% { transform: scale(1.15); filter: drop-shadow(0 0 12px red); }
+    }
 
-.dropdown-content button {
-  background: none;
-  color: black;
-  padding: 12px 16px;
-  text-align: left;
-  border: none;
-  border-bottom: 1px solid #ddd;
-  width: 100%;
-}
+    /* 3. Greyed-out Disabled Submit Button */
+    #submitReportBtn:disabled {
+      background-color: #cccccc !important;
+      color: #666666 !important;
+      cursor: not-allowed;
+    }
 
-.dropdown-content button:hover {
-  background-color: #f1f1f1;
-}
-/* 1. Map Margins and Border */
-#map {
-  margin: 15px;
-  border: 4px solid #333;
-  border-radius: 8px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-  height: calc(100vh - 120px); /* Adjusts height so it doesn't scroll off-screen */
-  box-sizing: border-box;
-}
+    /* 4. Empty Form Error Message */
+    .error-msg {
+      color: #d32f2f;
+      font-size: 13px;
+      font-weight: bold;
+      display: none;
+      margin-bottom: 10px;
+      text-align: center;
+    }
 
-/* 2. Flashing / Pulsing animation for High Priority Pins */
-.pulse-high-priority {
-  animation: pulsate 1s infinite alternate;
-}
-@keyframes pulsate {
-  0% { transform: scale(1); filter: drop-shadow(0 0 2px red); }
-  100% { transform: scale(1.15); filter: drop-shadow(0 0 12px red); }
-}
+    /* 5. Custom Floating Top Right Menu */
+    .top-right-menu {
+      position: absolute;
+      top: 25px;
+      right: 25px;
+      z-index: 1001; 
+    }
+    
+    .menu-fab {
+      width: 45px;
+      height: 45px;
+      border-radius: 50%;
+      background-color: #ffffff;
+      color: #333333;
+      border: 2px solid #dddddd;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0;
+      padding: 0;
+    }
 
-/* 3. Greyed-out Disabled Submit Button */
-#submitReportBtn:disabled {
-  background-color: #cccccc !important;
-  color: #666666 !important;
-  cursor: not-allowed;
-}
+    .dropdown-content {
+      position: absolute;
+      right: 0;
+      top: 55px;
+      background-color: #ffffff;
+      min-width: 200px;
+      box-shadow: 0px 8px 16px rgba(0,0,0,0.25);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid #eeeeee;
+      overflow: hidden;
+    }
 
-/* 4. Empty Form Error Message */
-.error-msg {
-  color: #d32f2f;
-  font-size: 13px;
-  font-weight: bold;
-  display: none;
-  margin-bottom: 10px;
-  text-align: center;
-}
+    .hidden-dropdown { display: none !important; }
 
-
+    .dropdown-content button {
+      background: none;
+      color: #333333;
+      padding: 14px 16px;
+      text-align: left;
+      border: none;
+      font-size: 14px;
+      border-bottom: 1px solid #f1f1f1;
+      margin: 0;
+      border-radius: 0;
+    }
+    .dropdown-content button:hover { background-color: #f5f5f5; }
+    .danger-btn { color: #d32f2f !important; }
   </style>
 </head>
 
 <body>
-   <!-- REPORT ENTRY MODAL -->
+  <!-- REPORT ENTRY MODAL -->
   <div id="reportModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="reportModalTitle">
     <div class="modal-content">
       <h3 id="reportModalTitle">📝 Submit New Report</h3>
@@ -170,14 +178,9 @@
       <label for="equipment">Equipment/Vehicles:</label>
       <input type="text" id="equipment" placeholder="e.g., White Ford F-150">
 
-      <!-- THIS IS THE MISSING FIELD THAT CRASHED THE SUBMIT BUTTON! -->
       <label for="resources">Resources:</label>
       <input type="text" id="resources" placeholder="e.g., Water, Medics, Tow Truck">
       
-      <label for="actions">Observed Actions:</label>
-      <textarea id="actions" rows="3" placeholder="e.g., Unloading materials..."></textarea>
-      
-            <!-- Add this dropdown above your observed actions text area -->
       <label for="priority">Encounter Type & Priority:</label>
       <select id="priority">
         <option value="Low">Low - Unknown / Suspicious Activity</option>
@@ -188,22 +191,21 @@
       <label for="actions">Observed Actions:</label>
       <textarea id="actions" rows="3" placeholder="e.g., Unloading materials..."></textarea>
 
-
+      <!-- FORM VALIDATION ERROR AND BUTTONS -->
+      <div id="reportError" class="error-msg" style="margin-top: 10px;">⚠️ Please enter at least one detail before submitting.</div>
+      
       <div class="modal-buttons">
         <button class="btn-cancel" onclick="closeReportModal()">Cancel</button>
-        <button onclick="submitReport()">Submit Report</button>
+        <button id="submitReportBtn" onclick="submitReport()" disabled>Submit Report</button>
       </div>
     </div>
   </div>
-
 
   <!-- COPY TEXT MODAL -->
   <div id="copyModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="copyModalTitle">
     <div class="modal-content">
       <h3 id="copyModalTitle">📋 Formatted Report</h3>
-      
-      <textarea id="reportText" rows="6" readonly aria-readonly="true"></textarea>
-      
+      <textarea id="reportText" rows="10" readonly aria-readonly="true"></textarea>
       <div class="modal-buttons">
         <button class="btn-cancel" onclick="closeCopyModal()">Close</button>
         <button onclick="copyReport()">Copy to Clipboard</button>
@@ -213,7 +215,6 @@
 
   <!-- MAIN APP LANDMARK -->
   <main>
-    
     <!-- PASSWORD SCREEN -->
     <div id="login-screen" role="region" aria-label="Authentication">
       <h3>🛡️ Secure Access Required</h3>
@@ -223,37 +224,43 @@
       <div id="login-error" role="alert" aria-live="assertive" style="color: #d90000; margin-top: 10px; text-align: center; font-weight: bold; max-width: 80%;"></div>
     </div>
 
-    <!-- MAIN APP CONTROLS (Hidden initially) -->
+    <!-- MAIN APP CONTROLS -->
     <div id="main-app" class="hidden-screen" inert aria-hidden="true">
       <div class="controls">
         <h3>🛡️ Anonymous Community Map</h3>
         
         <div style="margin-bottom: 10px; display: flex; gap: 5px;">
-          <label for="searchInput" class="visually-hidden" style="display:none;">Search location</label>
           <input type="text" id="searchInput" placeholder="Search neighborhood or intersection..." aria-label="Search for a neighborhood or intersection" style="flex-grow: 1; padding: 8px; border-radius: 4px; border: 2px solid #555;">
           <button onclick="window.searchLocation()" style="background: #222222; margin: 0;" aria-label="Execute search">🔍 Search</button>
         </div>
 
         <button onclick="toggleReport()" aria-label="Toggle drop pin mode">📍 Drop Pin</button>
-        <button onclick="logout()" class="btn-logout" style="float: right;" aria-label="Log out of application">Logout</button>
         <div id="status" role="status" aria-live="polite" style="font-weight: bold; margin-top: 8px;">Ready</div>
       </div>
-      <!-- Top Right Menu -->
-<div class="top-right-menu">
-  <button class="menu-button" onclick="toggleDropdown()">☰ Menu</button>
-  <div id="actionDropdown" class="dropdown-content" style="display: none;">
-    <button onclick="copyCLEAR()">📋 Copy CLEAR Report</button>
-    <button onclick="logout()">🚪 Logout</button>
-  </div>
-</div>
+      
+      <!-- Container for map so menu floats properly over it -->
+      <div style="position: relative;">
+        
+        <!-- Top Right Menu (Properly formatted for JS) -->
+        <div class="top-right-menu" id="menuContainer">
+          <button class="menu-fab" onclick="toggleDropdown(event)" aria-label="Open Menu">
+            <span style="font-size: 20px;">☰</span>
+          </button>
+          
+          <div id="actionDropdown" class="dropdown-content hidden-dropdown">
+            <button onclick="copyCLEAR()">📋 Copy CLEAR Report</button>
+            <button onclick="logout()" class="danger-btn">🚪 Logout</button>
+          </div>
+        </div>
 
-
-      <!-- Leaflet Map Container -->
-      <div id="map" aria-label="Interactive incident map"></div>
+        <!-- Leaflet Map Container -->
+        <div id="map" aria-label="Interactive incident map"></div>
+        
+      </div>
       
       <!-- RECENT REPORTS LIST -->
       <div id="recentContainer" style="padding: 10px; background: #f9f9f9; border-top: 2px solid #ccc;">
-        <h4>Recent Reports</h4>
+        <h4 style="margin-top: 0;">Recent Reports</h4>
         <div id="recentList" style="font-size: 0.9em; color: #444;">
           <!-- JavaScript will populate this list -->
         </div>
@@ -262,7 +269,7 @@
     </div>
   </main>
 
-  <!-- SCRIPTS: Order matters! Leaflet must load before your custom scripts -->
+  <!-- SCRIPTS: Order matters! -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="/js/ui.js"></script>
   <script src="/js/privacy.js"></script>
@@ -271,5 +278,3 @@
 
 </body>
 </html>
-
-
