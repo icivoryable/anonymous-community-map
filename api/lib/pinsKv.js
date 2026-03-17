@@ -24,16 +24,8 @@ export async function savePin({ lat, lng, description = "", status = "Reported" 
   const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const createdAt = Date.now();
   
-  const fuzzed = fuzzLocation(lat, lng);
-  
-  const pin = { 
-    id, 
-    lat: fuzzed.lat, 
-    lng: fuzzed.lng, 
-    description, 
-    status, 
-    createdAt 
-  };
+    const pin = { id, lat: Number(lat), lng: Number(lng), description, status, createdAt };
+
   
   await redis.set(`pin:${id}`, JSON.stringify(pin), { ex: RETENTION_SECONDS });
   await redis.zadd("pins:index", { score: createdAt, member: id });
@@ -54,7 +46,7 @@ export async function listPinsLast3Weeks() {
   return pins.filter(Boolean).map(pin => typeof pin === 'string' ? JSON.parse(pin) : pin);
 }
 
-// Add this at the bottom of api/lib/pinsKv.js
+// Added this at the bottom of api/lib/pinsKv.js
 export async function updatePinStatus(id, newStatus) {
   const pinString = await redis.get(`pin:${id}`);
   if (!pinString) throw new Error("Pin not found or expired.");

@@ -33,10 +33,84 @@
     
     /* Hides the main app initially */
     .hidden-screen { display: none !important; } 
+
+    /* Modal Overlay Background */
+.modal-overlay {
+  display: none; /* Hidden by default, toggled to flex by JS */
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 10000;
+  align-items: center; justify-content: center;
+}
+
+/* Modal Content Box */
+.modal-content {
+  background: white; padding: 20px; border-radius: 8px;
+  width: 90%; max-width: 400px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.modal-content h3 { margin-top: 0; }
+.modal-content label { font-weight: bold; display: block; margin-top: 10px; }
+.modal-content input, .modal-content textarea { 
+  width: 100%; padding: 8px; margin-top: 5px; 
+  box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;
+}
+.modal-buttons { margin-top: 15px; display: flex; justify-content: flex-end; gap: 10px; }
+
+/* Cancel Button Style */
+.btn-cancel { background: #666; }
+.btn-cancel:hover { background: #444; }
+
   </style>
 </head>
 
 <body>
+<!-- REPORT ENTRY MODAL -->
+<div id="reportModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="reportModalTitle">
+  <div class="modal-content">
+    <h3 id="reportModalTitle">📝 Submit New Report</h3>
+    
+    <label for="count">Count (How many?):</label>
+    <input type="text" id="count" placeholder="e.g., 2 people, 1 vehicle">
+    
+    <label for="location">Location Details:</label>
+    <input type="text" id="location" placeholder="e.g., NE corner of intersection">
+    
+    <label for="equipment">Equipment/Vehicles:</label>
+    <input type="text" id="equipment" placeholder="e.g., White Ford F-150">
+    
+    <label for="actions">Observed Actions:</label>
+    <textarea id="actions" rows="3" placeholder="e.g., Unloading materials..."></textarea>
+    
+    <div class="modal-buttons">
+      <button class="btn-cancel" onclick="closeReportModal()">Cancel</button>
+      <button onclick="submitReport()">Submit Report</button>
+    </div>
+  </div>
+</div>
+
+<!-- COPY TEXT MODAL -->
+<div id="copyModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="copyModalTitle">
+  <div class="modal-content">
+    <h3 id="copyModalTitle">📋 Formatted Report</h3>
+    
+    <textarea id="reportText" rows="6" readonly aria-readonly="true"></textarea>
+    
+    <div class="modal-buttons">
+      <button class="btn-cancel" onclick="closeCopyModal()">Close</button>
+      <button onclick="copyReport()">Copy to Clipboard</button>
+    </div>
+  </div>
+</div>
+
+<!-- RECENT REPORTS LIST (Optional sidebar/footer) -->
+<div id="recentContainer" style="padding: 10px; background: #f9f9f9; border-top: 2px solid #ccc;">
+  <h4>Recent Reports</h4>
+  <div id="recentList" style="font-size: 0.9em; color: #444;">
+    <!-- JavaScript will populate this list -->
+  </div>
+</div>
 
   <!-- The <main> landmark satisfies the accessibility requirement -->
   <main>
@@ -304,21 +378,15 @@
       location.reload();
     }
 
-    window.toggleReport = function toggleReport() {
-      dropMode = !dropMode;
-      setStatus(dropMode ? 'Drop mode: click map to add a pin' : `Ready (Logged in as: ${userRole})`);
-    };
-
-    window.copyCLEAR = async function copyCLEAR() {
-      clearBox.classList.remove('hidden-screen');
-      clearText.select();
-      await navigator.clipboard.writeText(clearText.value);
-      setStatus('Copied to clipboard');
-    };
-
     window.onload = () => {
       if (localStorage.getItem('map_access_code')) checkAccess();
     };
   </script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/js/ui.js"></script>
+  <script src="/js/privacy.js"></script>
+  <script src="/js/storage.js"></script>
+  <script src="/js/map.js"></script>
 </body>
 </html>
+
