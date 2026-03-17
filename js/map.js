@@ -43,7 +43,7 @@ function getPinIcon(status, priorityLevel) {
   
   // Status overrides colors
   if (status === 'Under Verification') color = 'orange';
-  if (status === 'Confirmed') color = 'darkred'; // Differentiates from standard red
+  if (status === 'Confirmed') color = 'violet'; // Changed to violet!
   if (status === 'Resolved') color = 'green';
   if (status === 'False') color = 'black';
   
@@ -125,7 +125,6 @@ window.updateRecentList = function(pins) {
     div.style.alignItems = "center";
     
     const textSpan = document.createElement("span");
-    // Inserted the priority label!
     textSpan.innerHTML = `${priorityLabel} ${reportData.location || 'Reported Location'} – ${new Date(pin.createdAt).toLocaleTimeString()}`;
     
     const copyBtn = document.createElement("button");
@@ -161,3 +160,4 @@ window.loadPins = async function loadPins(code) {
   }
   return true;
 }
+

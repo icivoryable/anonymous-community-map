@@ -238,20 +238,21 @@
         <div id="status" role="status" aria-live="polite" style="font-weight: bold; margin-top: 8px;">Ready</div>
       </div>
       
-      <!-- Container for map so menu floats properly over it -->
-      <div style="position: relative;">
+            <!-- FIXED Top Right Menu -->
+      <div class="top-right-menu" id="menuContainer" style="position: fixed; top: 20px; right: 20px; z-index: 9999;">
+        <button class="menu-fab" onclick="toggleDropdown(event)" aria-label="Open Menu">
+          <span style="font-size: 20px;">☰</span>
+        </button>
         
-        <!-- Top Right Menu (Properly formatted for JS) -->
-        <div class="top-right-menu" id="menuContainer">
-          <button class="menu-fab" onclick="toggleDropdown(event)" aria-label="Open Menu">
-            <span style="font-size: 20px;">☰</span>
-          </button>
-          
-          <div id="actionDropdown" class="dropdown-content hidden-dropdown">
-            <button onclick="copyCLEAR()">📋 Copy CLEAR Report</button>
-            <button onclick="logout()" class="danger-btn">🚪 Logout</button>
-          </div>
+        <div id="actionDropdown" class="dropdown-content hidden-dropdown">
+          <button onclick="copyCLEAR()">📋 Copy CLEAR Report</button>
+          <button onclick="logout()" class="danger-btn">🚪 Logout</button>
         </div>
+      </div>
+
+      <!-- Leaflet Map Container -->
+      <div id="map" aria-label="Interactive incident map"></div>
+
 
         <!-- Leaflet Map Container -->
         <div id="map" aria-label="Interactive incident map"></div>
