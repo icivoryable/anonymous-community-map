@@ -18,28 +18,44 @@ async function checkAccess() {
     }
     
     localStorage.setItem('map_access_code', code);
+    
+    // Show the app first
     showApp();
-    if (window.map) window.map.invalidateSize(); 
+    
+    // Wait for the browser to render the un-hidden DOM
+    setTimeout(() => {
+      // 1. Initialize the map
+      if (window.initMap) window.initMap();
+      
+      // 2. Aggressively force Leaflet to recalculate everything
+      if (window.map) {
+        window.map.invalidateSize(true);
+        window.map.setView([27.9506, -82.4572], 12); // Re-center on Tampa
+      }
+    }, 100);
+
     setStatus(`Ready (Logged in as: ${userRole})`);
   } catch (err) {
     errorEl.textContent = `Network error: ${err.message}`;
   }
 }
+
 window.checkAccess = checkAccess;
 
 async function submitReport() {
   // 1. Make sure we actually clicked the map first!
   if (!window.clickLatLng) return;
 
-  // 2. Gather all the data from your new HTML form
+  // 2. Gather all the data from your new HTML form (including Resources)
   const statusString = 'Reported'; // Default
   const count = document.getElementById("count").value;
   const location = document.getElementById("location").value;
   const equipment = document.getElementById("equipment").value;
   const actions = document.getElementById("actions").value;
+  const resources = document.getElementById("resources").value;
   
   // 3. Combine the form data into a single string for your backend
-  const message = JSON.stringify({ count, location, equipment, actions });
+  const message = JSON.stringify({ count, location, equipment, actions, resources });
 
   // 4. Secure the coordinates BEFORE sending them over the internet
   const safeCoords = window.obfuscateLocation(window.clickLatLng.lat, window.clickLatLng.lng);
@@ -69,8 +85,11 @@ async function submitReport() {
   } catch (err) {
     setStatus(`Error: ${err.message}`);
   } finally {
+    // 6. Clean up the UI
     closeReportModal();
     window.dropMode = false;
+    document.getElementById('map').classList.remove('crosshair-mode'); // Turn off crosshairs
+    setStatus(`Ready (Logged in as: ${userRole})`); // Reset status text
   }
 }
 
@@ -92,4 +111,5 @@ async function updatePin(id, newStatus) {
     setStatus(`Error: ${e.message}`);
   }
 }
+
 window.updatePin = updatePin;

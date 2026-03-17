@@ -23,16 +23,25 @@ function initMap() {
   });
 }
 
-function toggleReport() {
+window.toggleReport = function toggleReport() {
   window.dropMode = !window.dropMode;
-  setStatus(window.dropMode ? 'Drop mode: click map to add a pin' : `Ready (Logged in as: ${userRole})`);
+  
+  if (window.dropMode) {
+    setStatus('Drop mode: click map to add a pin');
+    document.getElementById('map').classList.add('crosshair-mode');
+  } else {
+    setStatus(`Ready (Logged in as: ${userRole})`);
+    document.getElementById('map').classList.remove('crosshair-mode');
+  }
 }
 
 function getColoredIcon(status) {
   let color = 'blue'; 
   if (status === 'Reported') color = 'grey';
+  if (status === 'Under Verification') color = 'orange'; // Good to have this too!
   if (status === 'Confirmed') color = 'red';
   if (status === 'Resolved') color = 'green';
+  if (status === 'False') color = 'black'; // NEW: False reports turn black
   
   return new L.Icon({
     iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
@@ -43,10 +52,10 @@ function getColoredIcon(status) {
   });
 }
 
+
 window.renderPin = function renderPin(pin) {
   const div = document.createElement('div');
   
-  // Try to parse the JSON string back into your structured report
   let reportData = { actions: pin.description }; 
   try { reportData = JSON.parse(pin.description); } catch(e) {}
   
@@ -54,8 +63,8 @@ window.renderPin = function renderPin(pin) {
 
   let html = `
     <strong>Status: ${pin.status}</strong><br/>
-    <pre style="font-size: 0.8em; margin: 5px 0;">${formattedText}</pre>
-    <button onclick="openCopyModal(\`${formattedText.replace(/`/g, "'")}\`)" style="padding:4px; font-size:12px;">Copy</button>
+    <pre style="font-size: 0.8em; margin: 5px 0; white-space: pre-wrap; font-family: inherit;">${formattedText}</pre>
+    <button onclick="openCopyModal(\`${formattedText.replace(/`/g, "'")}\`)" style="background: #222; width: 100%; margin: 5px 0 0 0;">📋 Copy This Report</button>
   `;
 
   if (userRole === 'admin') {
@@ -65,6 +74,18 @@ window.renderPin = function renderPin(pin) {
         <button onclick="updatePin('${pin.id}', 'Confirmed')" style="background:#b30000; color:white; border:none; padding:4px; font-size:12px;">Set: Confirmed</button>
         <button onclick="updatePin('${pin.id}', 'Resolved')" style="background:#006600; color:white; border:none; padding:4px; font-size:12px;">Set: Resolved</button>
       </div>`;
+
+        if (userRole === 'admin') {
+    html += `<hr style="margin:5px 0;">
+      <div style="display:flex; flex-direction:column; gap:4px;">
+        <button onclick="updatePin('${pin.id}', 'Under Verification')" style="background:#005a87; color:white; border:none; padding:4px; font-size:12px;">Set: Verifying</button>
+        <button onclick="updatePin('${pin.id}', 'Confirmed')" style="background:#b30000; color:white; border:none; padding:4px; font-size:12px;">Set: Confirmed</button>
+        <button onclick="updatePin('${pin.id}', 'Resolved')" style="background:#006600; color:white; border:none; padding:4px; font-size:12px;">Set: Resolved</button>
+        <!-- NEW: False Report Button -->
+        <button onclick="updatePin('${pin.id}', 'False')" style="background:#222222; color:white; border:none; padding:4px; font-size:12px;">Set: False Report</button>
+      </div>`;
+  }
+
   }
   
   div.innerHTML = html;
@@ -81,11 +102,50 @@ window.loadPins = async function loadPins(code) {
   const data = await res.json();
   userRole = data.role; 
   
-  if (!window.markers) initMap(); 
-  window.markers.clearLayers();
-  
-  if (data.pins && data.pins.length > 0) {
-    data.pins.forEach(p => window.renderPin(p));
+  if (window.markers) {
+    window.markers.clearLayers();
+    if (data.pins && data.pins.length > 0) {
+      data.pins.forEach(p => window.renderPin(p));
+      window.updateRecentList(data.pins);
+    }
   }
   return true;
+}
+
+window.updateRecentList = function(pins) {
+  const list = document.getElementById("recentList");
+  if (!list) return;
+  list.innerHTML = "";
+  
+  pins.slice(-5).reverse().forEach(pin => {
+    let reportData = { actions: pin.description, location: "Unknown" }; 
+    try { reportData = JSON.parse(pin.description); } catch(e) {}
+    
+    const formattedText = formatReport({ ...reportData, createdAt: pin.createdAt });
+    
+    const div = document.createElement("div");
+    div.style.padding = "8px 5px";
+    div.style.borderBottom = "1px solid #eee";
+    div.style.display = "flex";
+    div.style.justifyContent = "space-between";
+    div.style.alignItems = "center";
+    
+    const textSpan = document.createElement("span");
+    textSpan.innerText = `📍 ${reportData.location || 'Reported Location'} – ${new Date(pin.createdAt).toLocaleTimeString()}`;
+    
+    const copyBtn = document.createElement("button");
+    copyBtn.innerText = "📋 Copy";
+    copyBtn.style.margin = "0";
+    copyBtn.style.padding = "4px 8px";
+    copyBtn.style.fontSize = "12px";
+    copyBtn.style.background = "#222";
+    
+    copyBtn.onclick = function() {
+      openCopyModal(formattedText.replace(/`/g, "'"));
+    };
+    
+    div.appendChild(textSpan);
+    div.appendChild(copyBtn);
+    list.appendChild(div);
+  });
 }
