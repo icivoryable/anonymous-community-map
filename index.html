@@ -68,18 +68,20 @@
     .crosshair-mode { cursor: crosshair !important; }
 
     /* 1. Map CSS Fixes - Edge to Edge, No Gap */
+        /* 1. Map CSS Fixes - Edge to Edge, No Gap */
     #map {
-      margin: 0; 
-      border-top: 4px solid #333;
-      border-bottom: 4px solid #333;
+      margin: 0 auto; /* Centers the map */
+      border: 4px solid #333; /* Put the full border back! */
+      border-radius: 8px; /* Restored the rounded corners */
       box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-      height: 55vh; /* Adjusted to fit the screen nicely */
+      height: 55vh; 
       min-height: 400px; 
-      width: 100%;
+      width: 95%; /* <--- THIS FIXES THE SIDE MARGINS! */
       position: relative;
       box-sizing: border-box;
-      z-index: 1; /* Keeps Leaflet controls under the dropdown menu */
+      z-index: 1;
     }
+
 
     /* 2. Flashing / Pulsing animation for High Priority Pins */
     .pulse-high-priority {

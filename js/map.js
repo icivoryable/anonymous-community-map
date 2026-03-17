@@ -81,12 +81,16 @@ window.renderPin = function renderPin(pin) {
     <button onclick="openCopyModal(\`${formattedText.replace(/`/g, "'")}\`)" style="background: #222; width: 100%; margin: 5px 0 0 0;">📋 Copy This Report</button>
   `;
 
-  if (userRole === 'admin') {
+    if (userRole === 'admin') {
     html += `<hr style="margin:5px 0;">
       <div style="display:flex; flex-direction:column; gap:4px;">
-        <button onclick="updatePin('${pin.id}', 'Under Verification')" style="background:#005a87; color:white; border:none; padding:4px; font-size:12px;">Set: Verifying</button>
-        <button onclick="updatePin('${pin.id}', 'Confirmed')" style="background:#b30000; color:white; border:none; padding:4px; font-size:12px;">Set: Confirmed</button>
+        <!-- Verifying is now Orange (#ff8c00) -->
+        <button onclick="updatePin('${pin.id}', 'Under Verification')" style="background:#ff8c00; color:white; border:none; padding:4px; font-size:12px;">Set: Verifying</button>
+        <!-- Confirmed is now Violet/Purple (#9400D3) -->
+        <button onclick="updatePin('${pin.id}', 'Confirmed')" style="background:#9400D3; color:white; border:none; padding:4px; font-size:12px;">Set: Confirmed</button>
+        <!-- Resolved stays Green -->
         <button onclick="updatePin('${pin.id}', 'Resolved')" style="background:#006600; color:white; border:none; padding:4px; font-size:12px;">Set: Resolved</button>
+        <!-- False Report stays Black -->
         <button onclick="updatePin('${pin.id}', 'False')" style="background:#222222; color:white; border:none; padding:4px; font-size:12px;">Set: False Report</button>
       </div>`;
   }
