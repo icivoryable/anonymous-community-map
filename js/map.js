@@ -63,13 +63,13 @@ function getPinIcon(status, priorityLevel) {
   });
 }
 
+// ... (keep your initMap, getPinIcon, and toggleReport functions as they are) ...
+
 window.renderPin = function renderPin(pin) {
   const div = document.createElement('div');
   
-  let reportData = { actions: pin.description }; 
-  try { reportData = JSON.parse(pin.description); } catch(e) {}
-  
-  // Grab the priority we saved, or default to 'Low'
+  // 1. JSON-in-JSON Fixed! We just grab the cleanly nested object!
+  const reportData = pin.report || {}; 
   const pinPriority = reportData.priority || 'Low'; 
   
   const formattedText = formatReport({ ...reportData, createdAt: pin.createdAt });
@@ -78,45 +78,71 @@ window.renderPin = function renderPin(pin) {
     <strong>Status: ${pin.status}</strong><br/>
     <strong>Priority: ${pinPriority}</strong><br/>
     <pre style="font-size: 0.8em; margin: 5px 0; white-space: pre-wrap; font-family: inherit;">${formattedText}</pre>
-    <button onclick="openCopyModal(\`${formattedText.replace(/`/g, "'")}\`)" style="background: #222; width: 100%; margin: 5px 0 0 0;">📋 Copy This Report</button>
+    <button onclick="openCopyModal(\`${formattedText.replace(/`/g, "'")}\`)" style="background: #222; width: 100%; margin: 5px 0 0 0;">📋 Copy</button>
   `;
 
-    if (userRole === 'admin') {
+  if (userRole === 'admin') {
     html += `<hr style="margin:5px 0;">
       <div style="display:flex; flex-direction:column; gap:4px;">
-        <!-- Verifying is now Orange (#ff8c00) -->
         <button onclick="updatePin('${pin.id}', 'Under Verification')" style="background:#ff8c00; color:white; border:none; padding:4px; font-size:12px;">Set: Verifying</button>
-        <!-- Confirmed is now Violet/Purple (#9400D3) -->
         <button onclick="updatePin('${pin.id}', 'Confirmed')" style="background:#9400D3; color:white; border:none; padding:4px; font-size:12px;">Set: Confirmed</button>
-        <!-- Resolved stays Green -->
         <button onclick="updatePin('${pin.id}', 'Resolved')" style="background:#006600; color:white; border:none; padding:4px; font-size:12px;">Set: Resolved</button>
-        <!-- False Report stays Black -->
         <button onclick="updatePin('${pin.id}', 'False')" style="background:#222222; color:white; border:none; padding:4px; font-size:12px;">Set: False Report</button>
       </div>`;
   }
   
   div.innerHTML = html;
 
-  // Create marker using the new combined function
+  L.marker([pin.lat, pin.lng], { icon: getPinIcon(pin.status, pinPriority) })
+    .addTo(window.markers)
+    .bindPopup(div);
+}
+// ... (keep your initMap, getPinIcon, and toggleReport functions as they are) ...
+
+window.renderPin = function renderPin(pin) {
+  const div = document.createElement('div');
+  
+  // 1. JSON-in-JSON Fixed! We just grab the cleanly nested object!
+  const reportData = pin.report || {}; 
+  const pinPriority = reportData.priority || 'Low'; 
+  
+  const formattedText = formatReport({ ...reportData, createdAt: pin.createdAt });
+
+  let html = `
+    <strong>Status: ${pin.status}</strong><br/>
+    <strong>Priority: ${pinPriority}</strong><br/>
+    <pre style="font-size: 0.8em; margin: 5px 0; white-space: pre-wrap; font-family: inherit;">${formattedText}</pre>
+    <button onclick="openCopyModal(\`${formattedText.replace(/`/g, "'")}\`)" style="background: #222; width: 100%; margin: 5px 0 0 0;">📋 Copy</button>
+  `;
+
+  if (userRole === 'admin') {
+    html += `<hr style="margin:5px 0;">
+      <div style="display:flex; flex-direction:column; gap:4px;">
+        <button onclick="updatePin('${pin.id}', 'Under Verification')" style="background:#ff8c00; color:white; border:none; padding:4px; font-size:12px;">Set: Verifying</button>
+        <button onclick="updatePin('${pin.id}', 'Confirmed')" style="background:#9400D3; color:white; border:none; padding:4px; font-size:12px;">Set: Confirmed</button>
+        <button onclick="updatePin('${pin.id}', 'Resolved')" style="background:#006600; color:white; border:none; padding:4px; font-size:12px;">Set: Resolved</button>
+        <button onclick="updatePin('${pin.id}', 'False')" style="background:#222222; color:white; border:none; padding:4px; font-size:12px;">Set: False Report</button>
+      </div>`;
+  }
+  
+  div.innerHTML = html;
+
   L.marker([pin.lat, pin.lng], { icon: getPinIcon(pin.status, pinPriority) })
     .addTo(window.markers)
     .bindPopup(div);
 }
 
-// 2. Updated Recent List (Adds bolding and emojis based on priority)
 window.updateRecentList = function(pins) {
   const list = document.getElementById("recentList");
   if (!list) return;
   list.innerHTML = "";
   
   pins.slice(-5).reverse().forEach(pin => {
-    let reportData = { actions: pin.description };
-    try { reportData = JSON.parse(pin.description); } catch(e) {}
-    
+    // Cleanly access the nested object!
+    const reportData = pin.report || {}; 
     const formattedText = formatReport({ ...reportData, createdAt: pin.createdAt });
     const pinPriority = reportData.priority || 'Low';
     
-    // Choose the icon/bolding for the recent list
     let priorityLabel = '🔵 ';
     if (pinPriority === 'Medium') priorityLabel = '🟡 <strong>MED:</strong> ';
     if (pinPriority === 'High') priorityLabel = '🔴 <strong>HIGH:</strong> ';

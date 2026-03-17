@@ -5,6 +5,12 @@ const clearText = document.getElementById('clearText');
 const loginScreen = document.getElementById('login-screen');
 const mainApp = document.getElementById('main-app');
 
+// --- XSS SANITIZER ---
+window.sanitize = function(input) {
+  if (!input) return "";
+  return input.toString().replace(/</g, "&lt;").replace(/>/g, "&gt;");
+};
+
 function setStatus(msg) { 
   if (statusEl) statusEl.textContent = msg; 
 }
@@ -45,12 +51,10 @@ document.addEventListener("click", function(event) {
   }
 });
 
-
 // --- FORM VALIDATION ---
 function validateForm() {
   const fields = ["count", "location", "equipment", "actions", "resources"];
   
-  // Check if at least one text box has text in it
   const hasData = fields.some(id => {
     const el = document.getElementById(id);
     return el && el.value.trim() !== "";
@@ -60,28 +64,25 @@ function validateForm() {
   const errorMsg = document.getElementById("reportError");
   
   if (submitBtn) {
-    submitBtn.disabled = !hasData; // Disables button if false
+    submitBtn.disabled = !hasData; 
   }
   if (errorMsg) {
-    errorMsg.style.display = hasData ? "none" : "block"; // Shows error if empty
+    errorMsg.style.display = hasData ? "none" : "block"; 
   }
 }
-
 
 // --- MODAL FUNCTIONS ---
 function openReportModal() {
   const modal = document.getElementById("reportModal");
   if (modal) modal.style.display = "flex";
   
-  // Run validation immediately so the button starts disabled
   validateForm();
   
-  // Listen for typing in any of the fields
   const fields = ["count", "location", "equipment", "actions", "resources"];
   fields.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
-      el.removeEventListener('input', validateForm); // Prevent duplicates
+      el.removeEventListener('input', validateForm); 
       el.addEventListener('input', validateForm);
     }
   });
@@ -91,23 +92,19 @@ function closeReportModal() {
   const modal = document.getElementById("reportModal");
   if (modal) modal.style.display = "none";
   
-  // Clear the inputs
   const fields = ["count", "location", "equipment", "actions", "resources"];
   fields.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
   
-  // Reset priority dropdown to Low
   const priorityEl = document.getElementById("priority");
   if (priorityEl) priorityEl.value = "Low";
   
-  // Turn off drop mode and crosshairs if they cancel
   window.dropMode = false;
   const mapEl = document.getElementById('map');
   if (mapEl) mapEl.classList.remove('crosshair-mode');
   
-  // Reset the status bar
   if (typeof userRole !== 'undefined') {
     setStatus(`Ready (Logged in as: ${userRole})`);
   }
@@ -140,19 +137,26 @@ async function copyReport() {
 }
 
 function formatReport(r) {
-  return `C - Count: ${r.count || 'N/A'}
-L - Location: ${r.location || 'N/A'}
-E - Equipment: ${r.equipment || 'N/A'}
-A - Actions: ${r.actions || 'N/A'}
-R - Resources: ${r.resources || 'N/A'}
+  // Uses XSS Sanitizer from top of file
+  const c = window.sanitize(r.count || 'N/A');
+  const l = window.sanitize(r.location || 'N/A');
+  const e = window.sanitize(r.equipment || 'N/A');
+  const a = window.sanitize(r.actions || 'N/A');
+  const res = window.sanitize(r.resources || 'N/A');
+  
+  return `C - Count: ${c}
+L - Location: ${l}
+E - Equipment: ${e}
+A - Actions: ${a}
+R - Resources: ${res}
 [Report Time: ${new Date(r.createdAt || Date.now()).toLocaleTimeString()}]`;
 }
 
-// Function to generate and copy a master CLEAR report of ACTIVE pins only, sorted by priority
+// Generate master CLEAR report of ACTIVE pins only
 window.copyCLEAR = async function copyCLEAR() {
   setStatus('Generating CLEAR report...');
   
-  const code = localStorage.getItem('map_access_code');
+  const code = sessionStorage.getItem('map_access_code');
   if (!code) {
     setStatus('Error: Not logged in');
     return;
@@ -162,7 +166,6 @@ window.copyCLEAR = async function copyCLEAR() {
     const res = await fetch('/api/pins', { headers: { 'x-access-code': code } });
     const data = await res.json(); 
     
-    // FILTER: Only keep pins that are "Reported" or "Under Verification"
     let reportedPins = data.pins ? data.pins.filter(p => p.status === 'Reported' || p.status === 'Under Verification') : [];
     
     if (reportedPins.length === 0) {
@@ -171,26 +174,20 @@ window.copyCLEAR = async function copyCLEAR() {
       return;
     }
 
-    // Helper function to assign a numerical score to the priority
     const getScore = (pin) => {
-      let reportData = {};
-      try { reportData = JSON.parse(pin.description); } catch(e) {}
+      const reportData = pin.report || {}; 
       const p = reportData.priority || 'Low';
       if (p === 'High') return 3;
       if (p === 'Medium') return 2;
-      return 1; // Low
+      return 1; 
     };
 
-    // Sort the array: highest score (3) goes to the top
     reportedPins.sort((a, b) => getScore(b) - getScore(a));
 
     let fullReport = "=== CLEAR REPORT ===\n\n";
     
-    // Loop through the FILTERED and SORTED pins!
     reportedPins.forEach((pin, index) => {
-      let reportData = { actions: pin.description }; 
-      try { reportData = JSON.parse(pin.description); } catch(e) {}
-      
+      const reportData = pin.report || {}; 
       const priorityLabel = reportData.priority || 'Low';
       
       fullReport += `[Incident ${index + 1} - PRIORITY: ${priorityLabel.toUpperCase()} - Status: ${pin.status}]\n`;
@@ -202,7 +199,7 @@ window.copyCLEAR = async function copyCLEAR() {
     setStatus('Ready');
 
   } catch (err) {
-    setStatus(`Failed to generate report: ${err.message}`);
+    setStatus(`Failed to generate report`);
   }
 };
 
@@ -217,17 +214,17 @@ if (accessInput) {
 }
 
 function logout() {
-  localStorage.removeItem('map_access_code');
+  sessionStorage.removeItem('map_access_code');
   location.reload();
 }
 
 window.onload = () => {
-  if (localStorage.getItem('map_access_code')) {
+  if (sessionStorage.getItem('map_access_code')) {
     if (typeof window.checkAccess === 'function') window.checkAccess();
   }
 };
 
-// Function to search for an intersection or neighborhood and fly the map there
+// Search for an intersection or neighborhood
 window.searchLocation = async function searchLocation() {
   const searchInput = document.getElementById('searchInput');
   if (!searchInput) return;
@@ -257,7 +254,7 @@ window.searchLocation = async function searchLocation() {
       setStatus('Location not found. Try a broader term.');
     }
   } catch (err) {
-    setStatus('Search error. Try zooming manually.');
+    setStatus('Search error.');
   }
 }
 
@@ -270,3 +267,33 @@ if (searchInputEl) {
     }
   });
 }
+
+// --- MOBILE HAPTICS & GEOLOCATION ---
+window.triggerHaptic = function() {
+  if (navigator.vibrate) {
+    navigator.vibrate(50);
+  }
+};
+
+window.centerOnMe = function() {
+  if (!navigator.geolocation) {
+    setStatus("Geolocation not supported by your browser.");
+    return;
+  }
+  
+  setStatus("Locating you...");
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      
+      if (window.map) {
+        window.map.flyTo([lat, lng], 16, { animate: true, duration: 1.5 });
+        setStatus("Location found.");
+      }
+    },
+    (error) => {
+      setStatus("Could not access location. Please check permissions.");
+    }
+  );
+};
